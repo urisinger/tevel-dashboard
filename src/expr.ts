@@ -84,71 +84,71 @@ export class Expr {
   /**
    * Reads a value from the given Uint8Array buffer according to the layout name.
    */
-  readValue(buf: Uint8Array, layoutName: string): Value | undefined {
+  readValue(buf: ArrayBuffer, layoutName: string): Value | null {
     const result = this.readValueHelper(buf, layoutName);
-    return result ? result[0] : undefined;
+    return result ? result[0] : null;
   }
 
   /**
    * Helper method that reads a value from the buffer and returns a tuple with the Value and the number of bytes read.
    */
-  private readValueHelper(buf: Uint8Array, layoutName: string): [Value, number] | undefined {
+  private readValueHelper(buf: ArrayBuffer, layoutName: string): [Value, number] | null {
     const layout = this.get(layoutName);
-    if (!layout) return undefined;
+    if (!layout) return null;
 
     let offset = 0;
     const fields: [string, Value][] = [];
-    const dataView = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    const dataView = new DataView(buf, 0, buf.byteLength);
 
     for (const [fieldName, type] of layout.fields) {
       let value: Value;
       switch (type.kind) {
         case "I8": {
-          if (offset + 1 > buf.length) return undefined;
+          if (offset + 1 > buf.byteLength) return null;
           const v = dataView.getInt8(offset);
           offset += 1;
           value = { kind: "I8", value: v };
           break;
         }
         case "I16": {
-          if (offset + 2 > buf.length) return undefined;
+          if (offset + 2 > buf.byteLength) return null;
           const v = dataView.getInt16(offset, true);
           offset += 2;
           value = { kind: "I16", value: v };
           break;
         }
         case "I32": {
-          if (offset + 4 > buf.length) return undefined;
+          if (offset + 4 > buf.byteLength) return null;
           const v = dataView.getInt32(offset, true);
           offset += 4;
           value = { kind: "I32", value: v };
           break;
         }
         case "I64": {
-          if (offset + 8 > buf.length) return undefined;
+          if (offset + 8 > buf.byteLength) return null;
           const v = dataView.getBigInt64(offset, true);
           offset += 8;
           value = { kind: "I64", value: v };
           break;
         }
         case "F32": {
-          if (offset + 4 > buf.length) return undefined;
+          if (offset + 4 > buf.byteLength) return null;
           const v = dataView.getFloat32(offset, true);
           offset += 4;
           value = { kind: "F32", value: v };
           break;
         }
         case "F64": {
-          if (offset + 8 > buf.length) return undefined;
+          if (offset + 8 > buf.byteLength) return null;
           const v = dataView.getFloat64(offset, true);
           offset += 8;
           value = { kind: "F64", value: v };
           break;
         }
         case "Struct": {
-          const subBuf = buf.subarray(offset);
+          const subBuf = buf.slice(offset);
           const result = this.readValueHelper(subBuf, type.name);
-          if (!result) return undefined;
+          if (!result) return null;
           const [subValue, consumed] = result;
           value = subValue;
           offset += consumed;

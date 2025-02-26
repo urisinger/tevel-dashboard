@@ -8,10 +8,11 @@ import { parser ,Expr, FieldType, Struct} from "./expr.ts"; // Your generated pa
 
 // The input string to parse.
 const input = `
-  struct Person {
-    age: i32,
+  struct Packet {
+    type: i32,
     height: f64,
-    name: i8
+    name: i8,
+    nigga:  i32,
   }
 
   struct Employee {
@@ -20,7 +21,6 @@ const input = `
   }
 `;
 
-// Parse the input and build an Expr instance.
 let expr: Expr;
 try {
   // Parse returns an array of struct definitions.
@@ -44,7 +44,7 @@ try {
             break;
           case "i64":
             fieldType = { kind: "I64" };
-            break;
+            break
           case "f32":
             fieldType = { kind: "F32" };
             break;

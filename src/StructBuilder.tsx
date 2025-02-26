@@ -1,4 +1,3 @@
-// StructBuilder.tsx
 import React from "react";
 import { Expr } from "./expr";
 

@@ -13,44 +13,47 @@ function buildValueFromForm(
     const fullName = prefix ? `${prefix}.${name}` : name;
     const data = formData[fullName];
 
+    let value = 0;
+    let value_float = 0.0;
+
     let parsedValue: Value;
-    console.log(ty.kind);
     switch (ty.kind) {
       case "I8":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        if (data !== undefined) {
+          value = parseInt(data, 10)
         }
-        parsedValue = { kind: "I8", value: parseInt(data, 10) };
+        parsedValue = { kind: "I8", value };
         break;
       case "I16":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        if (data !== undefined) {
+          value = parseInt(data, 10)
         }
-        parsedValue = { kind: "I16", value: parseInt(data, 10) };
+        parsedValue = { kind: "I16", value };
         break;
       case "I32":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        if (data !== undefined) {
+          value = parseInt(data, 10)
         }
-        parsedValue = { kind: "I32", value: parseInt(data, 10) };
+        parsedValue = { kind: "I32", value };
         break;
       case "I64":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        let big_value = BigInt(0);
+        if (data !== undefined) {
+           big_value = BigInt(data)
         }
-        parsedValue = { kind: "I64", value: BigInt(data) };
+        parsedValue = { kind: "I64", value: big_value };
         break;
       case "F32":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        if (data !== undefined) {
+          value_float = parseFloat(data)
         }
-        parsedValue = { kind: "F32", value: parseFloat(data) };
+        parsedValue = { kind: "F32", value: value_float };
         break;
       case "F64":
-        if (data === undefined) {
-          throw new Error(`Missing value for ${fullName}`);
+        if (data !== undefined) {
+          value_float = parseFloat(data)
         }
-        parsedValue = { kind: "F64", value: parseFloat(data) };
+        parsedValue = { kind: "F64", value: value_float };
         break;
       case "Struct": {
         const innerLayout = expr.layouts[ty.name];
