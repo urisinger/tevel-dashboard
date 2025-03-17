@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "backend:build": "cmake -S backend -B backend/build && cmake --build backend/build",
-    "backend:run": "backend/build/websocket_server"
+    "backend:run": "backend/build/websocket_server ${WS_PORT:-8080} ${IN_SERVER_IP:-127.0.0.1} ${IN_SERVER_PORT:-9001} ${OUT_SERVER_IP:-127.0.0.1} ${OUT_SERVER_PORT:-9002}"
   },
   "dependencies": {
     "@types/pegjs": "^0.10.6",

@@ -8,7 +8,7 @@ import { parser ,Expr, FieldType, Struct} from "./expr.ts"; // Your generated pa
 
 // The input string to parse.
 const input = `
-  struct Packet {
+  struct Person {
     type: i32,
     height: f64,
     name: i8,

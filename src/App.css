@@ -1,0 +1,180 @@
+/* Enhanced App styles */
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f5f7fa;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.app-header {
+  margin-bottom: 30px;
+}
+
+.app-title {
+  font-size: 2.2rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.app-subtitle {
+  color: #7f8c8d;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+.layout-selector-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.layout-selector {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  width: 300px;
+  max-width: 100%;
+  color: #2c3e50;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.3s;
+}
+
+.layout-selector:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.socket-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 15px;
+  font-size: 0.9rem;
+  vertical-align: middle;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.socket-status.connected {
+  color: #27ae60;
+  background-color: #eafaf1;
+}
+
+.socket-status.disconnected {
+  color: #e74c3c;
+  background-color: #fdedeb;
+}
+
+.socket-status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.socket-status-indicator.connected {
+  background-color: #27ae60;
+}
+
+.socket-status-indicator.disconnected {
+  background-color: #e74c3c;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 30px;
+}
+
+@media (min-width: 1024px) {
+  .main-content {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-panel, .viewer-panel {
+  min-width: 0; /* Ensures content can shrink below min-content width */
+}
+
+.sent-data-preview {
+  margin-top: 25px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sent-data-preview h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  color: #2c3e50;
+}
+
+.sent-data-info {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+}
+
+.sent-data-info span {
+  background-color: #f1f1f1;
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: #34495e;
+}
+
+.hex-data-container {
+  background-color: #2c3e50;
+  border-radius: 6px;
+  padding: 15px;
+  overflow-x: auto;
+}
+
+.hex-data {
+  margin: 0;
+  color: #ecf0f1;
+  font-family: monospace;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 15px;
+  }
+  
+  .app-title {
+    font-size: 1.8rem;
+  }
+  
+  .layout-selector {
+    width: 100%;
+  }
+  
+  .layout-selector-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .socket-status {
+    margin-left: 0;
+    margin-top: 10px;
+  }
+}

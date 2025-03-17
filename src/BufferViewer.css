@@ -1,0 +1,299 @@
+/* EnhancedBufferViewer.css */
+
+.enhanced-buffer-viewer {
+  margin-top: 30px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.viewer-header {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+  background-color: #f9f9f9;
+}
+
+.viewer-header h2 {
+  margin: 0 0 10px 0;
+  font-size: 1.5rem;
+  color: #2c3e50;
+}
+
+.buffer-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.9rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-label {
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.info-value {
+  background-color: #f1f1f1;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #34495e;
+  font-family: monospace;
+}
+
+.size-mismatch {
+  background-color: #ffecb3;
+  color: #e67e22;
+}
+
+.viewer-error {
+  margin: 15px 20px;
+  padding: 15px;
+  background-color: #ffebee;
+  border-left: 4px solid #f44336;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 4px;
+}
+
+.error-icon {
+  font-size: 1.5rem;
+}
+
+.error-message {
+  color: #c62828;
+  font-weight: 500;
+}
+
+.viewer-tabs {
+  display: flex;
+  padding: 0 20px;
+  border-bottom: 1px solid #eee;
+  background-color: #f9f9f9;
+}
+
+.tab-button {
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.95rem;
+  color: #7f8c8d;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: #3498db;
+}
+
+.tab-button.active {
+  color: #3498db;
+  border-bottom-color: #3498db;
+  font-weight: 500;
+}
+
+.viewer-content {
+  padding: 20px;
+  min-height: 200px;
+  max-height: 600px;
+  overflow: auto;
+}
+
+.no-data {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+/* Structured View Styles */
+.structured-view {
+  padding: 10px;
+}
+
+.struct-value {
+  border: 1px solid #e1e1e1;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 5px;
+  background-color: #f9f9f9;
+}
+
+.root-struct {
+  border: none;
+  padding: 0;
+  background-color: transparent;
+}
+
+.struct-field-row {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.struct-field-row:last-child {
+  border-bottom: none;
+}
+
+.field-name {
+  flex: 1;
+  font-weight: 500;
+  color: #34495e;
+  padding-right: 15px;
+}
+
+.field-value {
+  flex: 2;
+}
+
+.primitive-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background-color: white;
+  border: 1px solid #e1e1e1;
+}
+
+.value-content {
+  font-family: monospace;
+  font-size: 1.1rem;
+}
+
+.value-type {
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  background-color: #f1f1f1;
+  border-radius: 4px;
+}
+
+.integer-value {
+  border-left: 4px solid #2ecc71;
+}
+
+.bigint-value {
+  border-left: 4px solid #9b59b6;
+}
+
+.float-value {
+  border-left: 4px solid #3498db;
+}
+
+.unknown-value {
+  border-left: 4px solid #e74c3c;
+}
+
+/* Hex View Styles */
+.hex-viewer {
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.hex-header {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 2px solid #34495e;
+  color: #7f8c8d;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  background-color: white;
+}
+
+.offset-header {
+  width: 100px;
+  padding-right: 15px;
+  text-align: left;
+}
+
+.bytes-header {
+  flex: 1;
+  display: flex;
+}
+
+.byte-header {
+  width: 25px;
+  text-align: center;
+}
+
+.ascii-header {
+  width: 170px;
+  padding-left: 15px;
+}
+
+.hex-row {
+  display: flex;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.hex-row:hover {
+  background-color: #f5f5f5;
+}
+
+.offset-cell {
+  width: 100px;
+  padding-right: 15px;
+  color: #7f8c8d;
+}
+
+.bytes-cell {
+  flex: 1;
+  display: flex;
+}
+
+.byte-value {
+  width: 25px;
+  text-align: center;
+  color: #34495e;
+}
+
+.byte-value:hover {
+  background-color: #d6eaf8;
+  border-radius: 2px;
+}
+
+.byte-empty {
+  width: 25px;
+  text-align: center;
+  color: #bdc3c7;
+}
+
+.ascii-cell {
+  width: 170px;
+  padding-left: 15px;
+  display: flex;
+}
+
+.ascii-char {
+  width: 10px;
+  text-align: center;
+  color: #34495e;
+}
+
+/* JSON View Styles */
+.json-view {
+  padding: 15px;
+  background-color: #2c3e50;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.json-view pre {
+  margin: 0;
+  color: #ecf0f1;
+  font-family: monospace;
+  line-height: 1.5;
+}
