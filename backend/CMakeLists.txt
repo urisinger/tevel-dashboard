@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.50)
 project(WebSocketServer C)
 
 include(FetchContent)
@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
     libwebsockets
     GIT_REPOSITORY https://github.com/warmcat/libwebsockets.git
-    GIT_TAG v4.3.3 # Change to latest version if needed
+    GIT_TAG v4.3.5 # Change to latest version if needed
 )
 
 FetchContent_MakeAvailable(libwebsockets)

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Expr, Value } from "./expr";
 import ValueForm from "./StructBuilder";
-import encodeValue from "./encodeValue";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 import BufferViewer from "./BufferViewer";
 
@@ -16,8 +15,6 @@ interface AppProps {
 
 const App: React.FC<AppProps> = ({ expr }) => {
   const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
-  const [encodedBuffer, setEncodedBuffer] = useState<Uint8Array | null>(null);
-  const [encodedHex, setEncodedHex] = useState<string | null>(null);
   
   const { sendMessage, lastMessage, readyState } = useWebSocket("ws://localhost:8080", {
     protocols: ["websocket-to-tcp"],
@@ -45,21 +42,20 @@ const App: React.FC<AppProps> = ({ expr }) => {
 
   const onSubmit = (value: Value) => {
     if (!selectedLayout) return;
-    const layout = expr.layouts[selectedLayout];
+
+    const layout = expr.get(selectedLayout);
     if (!layout) return;
     
+    
     try {
-      const bytes = encodeValue(value);
+      const bytes = expr.encodeValue(value);
       const encoded = Array.from(bytes, function(byte) {
         return ('0' + (byte & 0xFF).toString(16)).slice(-2);
       }).join(' ');
       
       sendMessage(bytes);
-      setEncodedBuffer(bytes);
-      setEncodedHex(encoded);
     } catch (e: any) {
-      setEncodedHex(e.toString());
-      setEncodedBuffer(null);
+      console.log(e);
     }
   };
 
@@ -75,15 +71,13 @@ const App: React.FC<AppProps> = ({ expr }) => {
           className="layout-selector"
           onChange={(ev) => {
             setSelectedLayout(ev.target.value);
-            setEncodedBuffer(null);
-            setEncodedHex(null);
           }}
           value={selectedLayout || ""}
         >
           <option value="">Select a Layout</option>
-          {Object.keys(expr.layouts).map((key) => (
+          {Array.from(expr.structs.keys()).map((key) => (
             <option key={key} value={key}>
-              {key} ({expr.sizeOf(key)} bytes)
+              {key} ({expr.sizeof(key)} bytes)
             </option>
           ))}
         </select>

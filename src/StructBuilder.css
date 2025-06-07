@@ -1,157 +1,101 @@
 .form-container {
-    background-color: #f9f9f9;
-    border-radius: 8px;
-    padding: 20px;
-    margin-top: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .form-title {
-    font-size: 1.5rem;
-    margin-bottom: 5px;
-    color: #2c3e50;
-    font-weight: 600;
-  }
-  
-  .struct-size {
-    color: #7f8c8d;
-    margin-bottom: 20px;
-    font-size: 0.9rem;
-  }
-  
-  .struct-container {
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 15px;
-    background-color: white;
-  }
-  
-  .struct-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
-  }
-  
-  .struct-name {
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: #2c3e50;
-  }
-  
-  .struct-type {
-    margin-left: 10px;
-    background-color: #e7f2fa;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    color: #3498db;
-  }
-  
-  .struct-fields {
-    padding-left: 15px;
-  }
-  
-  .field-container {
-    margin-bottom: 15px;
-  }
-  
-  .field-label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: #34495e;
-  }
-  
-  .field-type {
-    background-color: #f1f1f1;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: #7f8c8d;
-    font-weight: normal;
-    margin-left: 5px;
-  }
-  
-  .field-input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-    transition: border-color 0.3s;
-  }
-  
-  .field-input:focus {
-    border-color: #3498db;
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-  }
-  
-  .form-actions {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-  }
-  
-  .form-status {
-    margin-left: 15px;
-    font-size: 0.9rem;
-    color: #27ae60;
-  }
-  
-  .submit-button {
-    background-color: #2ecc71;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    font-size: 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .submit-button:hover {
-    background-color: #27ae60;
-  }
-  
-  .submit-button.disabled {
-    background-color: #95a5a6;
-    cursor: not-allowed;
-  }
-  
-  .error-message {
-    color: #e74c3c;
-    padding: 10px;
-    border-left: 3px solid #e74c3c;
-    background-color: #fadbd8;
-    margin-bottom: 15px;
-    border-radius: 4px;
-  }
-  
-  .value-preview {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f5f5f5;
-    border-radius: 6px;
-  }
-  
-  .value-preview h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1.1rem;
-    color: #2c3e50;
-  }
-  
-  .value-preview pre {
-    background-color: #2c3e50;
-    color: #ecf0f1;
-    padding: 15px;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-family: monospace;
-    margin: 0;
-  }
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-title {
+  font-size: 1.5rem;
+  margin-bottom: 5px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.struct-size {
+  color: #7f8c8d;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+.struct-container {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 15px;
+  background-color: white;
+}
+
+.struct-header {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.struct-fields {
+  margin-left: 1rem;
+}
+
+.field-container {
+  margin-bottom: 15px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #34495e;
+}
+
+.field-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.field-input:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.submit-button {
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-button:hover {
+  background-color: #27ae60;
+}
+
+.submit-button.disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #e74c3c;
+  padding: 10px;
+  border-left: 3px solid #e74c3c;
+  background-color: #fadbd8;
+  margin-bottom: 15px;
+  border-radius: 4px;
+}
