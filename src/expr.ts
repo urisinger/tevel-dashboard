@@ -176,6 +176,36 @@ export class Expr {
     return result ? result[0] : null;
   }
 
+  defaultValue(type: FieldType): Value {
+    switch (type.kind) {
+      case "I8": return { kind: "I8", value: 0 };
+      case "I16": return { kind: "I16", value: 0 };
+      case "I32": return { kind: "I32", value: 0 };
+      case "I64": return { kind: "I64", value: BigInt(0) };
+      case "F32": return { kind: "F32", value: 0.0 };
+      case "F64": return { kind: "F64", value: 0.0 };
+      case "Enum": {
+        const enumDef = this.getEnum(type.name);
+        if (!enumDef || enumDef.size === 0) {
+          throw new Error(`Enum '${type.name}' not found or empty`);
+        }
+        const firstValue = Array.from(enumDef.keys())[0];
+        return { kind: "Enum", name: type.name, base: type.base, value: firstValue };
+      }
+      case "Struct": {
+        const struct = this.get(type.name);
+        if (!struct) {
+          throw new Error(`Struct '${type.name}' not found`);
+        }
+        const fields = new Map<string, Value>();
+        for (const [fieldName, fieldType] of struct.fields) {
+          fields.set(fieldName, this.defaultValue(fieldType));
+        }
+        return { kind: "Struct", name: type.name, fields };
+      }
+    }
+  }
+
   private readValueHelper(buf: ArrayBuffer, layoutName: string): [Value, number] | null {
     const struct = this.get(layoutName);
     if (!struct) return null;
