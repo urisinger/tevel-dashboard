@@ -11,46 +11,46 @@ const wrapInput = (name: string, typeKind: string, input: React.ReactNode) => (
   </div>
 );
 
-const I8Input = ({ name, value, onChange }: { name: string; value: number; onChange: (v: Value) => void }) =>
+const I8Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "I8",
     <input
       type="number"
       min={-128}
       max={127}
-      value={value}
+      defaultValue={0}
       className="field-input"
       onChange={(e) => onChange({ kind: "i8", value: parseInt(e.target.value) || 0 })}
     />
   );
 
 
-const I16Input = ({ name, value, onChange }: { name: string; value: number, onChange: (v: Value) => void }) =>
+const I16Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "I16",
     <input
       type="number"
       min={-32768}
       max={32767}
-      value={value}
+      defaultValue={0}
       className="field-input"
       onChange={(e) => onChange({ kind: "i16", value: parseInt(e.target.value) || 0 })}
     />
   );
 
-const I32Input = ({ name, value, onChange }: { name: string; value: number; onChange: (v: Value) => void }) =>
+const I32Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => void }) =>
   wrapInput(name, "I32",
     <input
       type="number"
       className="field-input"
-      value={value}
+      defaultValue={0}
       onChange={(e) => onChange({ kind: "i32", value: parseInt(e.target.value) || 0 })}
     />
   );
 
-const I64Input = ({ name, value, onChange }: { name: string; value: bigint; onChange: (v: Value) => void }) =>
+const I64Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => void }) =>
   wrapInput(name, "I64",
     <input
       type="number"
-      value={value.toString()}
+      defaultValue={0}
       className="field-input"
       onChange={(e) => {
         try {
@@ -62,23 +62,23 @@ const I64Input = ({ name, value, onChange }: { name: string; value: bigint; onCh
     />
   );
 
-const F32Input = ({ name, value, onChange }: { name: string; value: number; onChange: (v: Value) => void }) =>
+const F32Input = ({ name,  onChange }: { name: string;  onChange: (v: Value) => void }) =>
   wrapInput(name, "F32",
     <input
       type="number"
       step="any"
-      value={value}
+      defaultValue={0}
       className="field-input"
       onChange={(e) => onChange({ kind: "f32", value: parseFloat(e.target.value) || 0 })}
     />
   );
 
-const F64Input = ({ name, value, onChange }: { name: string; value: number; onChange: (v: Value) => void }) =>
+const F64Input = ({ name,  onChange }: { name: string;  onChange: (v: Value) => void }) =>
   wrapInput(name, "F64",
     <input
       type="number"
       step="any"
-      value={value}
+      defaultValue={0}
       className="field-input"
       onChange={(e) => onChange({ kind: "f64", value: parseFloat(e.target.value) || 0 })}
     />
@@ -89,65 +89,72 @@ const StructInput = ({
   structName,
   struct,
   expr,
-  value,
   onChange,
 }: {
   name: string;
   structName: string;
   struct: Struct;
   expr: Expr;
-  value: Value;
   onChange: (v: Value) => void;
 }) => {
-  const val =
-    value.kind === "Struct" && value.name === structName
-      ? value
-      : expr.defaultValue({ kind: "Struct", name: structName });
+  const [fields, setFields] = useState<Map<string, Value>>(new Map());
 
-  if (val.kind !== "Struct") return null;
+  const purgeDependentMatches = (
+    discriminantName: string,
+    map: Map<string, Value>
+  ) => {
+    for (const [fname, ftype] of struct.fields) {
+      if (ftype.kind === "Match" && ftype.discriminant === discriminantName) {
+        map.delete(fname);
+      }
+    }
+  };
 
   return (
     <div className="struct-container">
       <div className="struct-header">
         <span className="struct-name">{name}</span>
       </div>
+
       <div className="struct-fields">
-        {struct.fields.map(([fieldName, fieldType]) => {
-          const fieldValue = val.fields.get(fieldName) ?? expr.defaultValue(fieldType);
-          return (
-            <ValueInput
-              key={fieldName}
-              name={fieldName}
-              type={fieldType}
-              expr={expr}
-              value={fieldValue}
-              onChange={(v) => {
-                const updated = new Map(val.fields);
-                updated.set(fieldName, v);
-                onChange({ kind: "Struct", name: structName, fields: updated });
-              }}
-              parentStruct={val}
-            />
-          );
-        })}
+        {struct.fields.map(([fieldName, fieldType]) => (
+          <ValueInput
+            key={fieldName}
+            name={fieldName}
+            type={fieldType}
+            expr={expr}
+            parentFields = {fields}
+            onChange={(v) => {
+              const updated = new Map(fields);
+              updated.set(fieldName, v);
+
+              /** if this field is an Enum → clean its Match dependents */
+              if (fieldType.kind === "Enum") {
+                purgeDependentMatches(fieldName, updated);
+              }
+
+              setFields(updated);
+              onChange({ kind: "Struct", name: structName, fields: updated });
+            }}
+          />
+        ))}
       </div>
     </div>
   );
 };
+
 
 const EnumInput = ({
   name,
   enumName,
   base,
   expr,
-  value,
   onChange
 }: {
   name: string;
   enumName: string;
   expr: Expr;
   base: "i8" | "i16" | "i32" | "i64";
-  value: string;
   onChange: (v: Value) => void;
 }) => {
   const enumDef = expr.getEnum(enumName);
@@ -158,15 +165,20 @@ const EnumInput = ({
 
   const entries = Array.from(enumDef); // [ ["Ok", 0], ["Fail", 1], ... ]
 
+
+
+  const [selected, setSelected] = useState(entries[0][0]);
+
   return wrapInput(name, enumName,
     <select
       className="field-input"
-      
-      value={value}
+      value = {selected}
       onChange={(e) => {
         const value = e.target.value;
+        setSelected(value);
         if (value !== "") {
           onChange({ kind: "Enum", name: enumName, base, value });
+          
         }
       }}
     >
@@ -185,19 +197,19 @@ const MatchInput: React.FC<{
   name: string;
   type: Extract<FieldType, { kind: "Match" }>;
   expr: Expr;
-  parentStruct: Extract<Value, { kind: "Struct" }>;
-  value: Value
+  parentFields: Map<string, Value> | null;
   onChange: (v: Value) => void;
-}> = ({ name, type, expr, parentStruct,value, onChange }) => {
-  const discriminantValue = parentStruct?.fields.get(type.discriminant);
-  const selectedCase = discriminantValue?.kind === "Enum"
-    ? type.cases.get(discriminantValue.value)
-    : undefined;
+}> = ({ name, type, expr, parentFields, onChange }) => {
+  const discriminantValue = parentFields?.get(type.discriminant);
+  const enumKey =
+    discriminantValue?.kind === "Enum"
+      ? discriminantValue.value
+      : Array.from(type.cases.keys())[0];
+  const selectedCase = type.cases.get(enumKey)!;
 
 
-  if (!selectedCase) {
-    return <></>;
-  }
+
+
 
   return (
     <div className="match-container">
@@ -205,9 +217,8 @@ const MatchInput: React.FC<{
         name={name}
         type={selectedCase}
         expr={expr}
-        value={value}
         onChange={onChange}
-        parentStruct={parentStruct}
+        parentFields={parentFields}
       />
     </div>
   );
@@ -218,23 +229,22 @@ const ValueInput: React.FC<{
   name: string;
   type: FieldType;
   expr: Expr;
-  value: Value;
   onChange: (value: Value) => void;
-  parentStruct: Extract<Value, { kind: "Struct" }>;
-}> = ({ name, type, expr, value, onChange, parentStruct }) => {
+  parentFields: Map<string, Value> | null;
+}> = ({ name, type, expr, onChange, parentFields }) => {
   switch (type.kind) {
     case "i8":
-      return <I8Input name={name} value={value.kind == "i8" ? value.value : 0} onChange={onChange} />;
+      return <I8Input name={name} onChange={onChange} />;
     case "i16":
-      return <I16Input name={name} value={value.kind == "i16" ? value.value : 0} onChange={onChange} />;
+      return <I16Input name={name} onChange={onChange} />;
     case "i32":
-      return <I32Input name={name} value={value.kind == "i32" ? value.value : 0} onChange={onChange} />;
+      return <I32Input name={name} onChange={onChange} />;
     case "i64":
-      return <I64Input name={name} value={value.kind == "i64" ? value.value : BigInt(0)} onChange={onChange} />;
+      return <I64Input name={name} onChange={onChange} />;
     case "f32":
-      return <F32Input name={name} value={value.kind == "f32" ? value.value : 0} onChange={onChange} />;
+      return <F32Input name={name} onChange={onChange} />;
     case "f64":
-      return <F64Input name={name} value={value.kind == "f64" ? value.value : 0} onChange={onChange} />;
+      return <F64Input name={name} onChange={onChange} />;
     case "Struct": {
       const struct = expr.get(type.name);
       if (!struct)
@@ -245,7 +255,6 @@ const ValueInput: React.FC<{
           structName={type.name}
           struct={struct}
           expr={expr}
-          value={value}
           onChange={onChange}
         />
       );
@@ -257,7 +266,6 @@ const ValueInput: React.FC<{
           enumName={type.name}
           expr={expr}
           base={type.base}
-          value={value.kind === "Enum" ? value.value : ""}
           onChange={onChange}
         />
       );
@@ -267,8 +275,7 @@ const ValueInput: React.FC<{
           name={name}
           type={type}
           expr={expr}
-          parentStruct={parentStruct}
-          value={value}
+          parentFields={parentFields}
           onChange={onChange}
         />
       );
@@ -284,78 +291,77 @@ interface ValueFormProps {
 }
 
 const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, onSubmit }) => {
- const [value, setValue] = useState<{ structName: string; value: Value } | null>(null);
+  const [fields, setFields] = useState<Map<string, Value>>(new Map());
   const struct = expr.get(structName);
 
-  useEffect(() => {
-    const initial = expr.defaultValue({ kind: "Struct", name: structName });
-    setValue({ structName, value: initial });
-  }, [expr, structName]);
+  if (!struct) {
+    return <div className="loading-message">Loading form...</div>;
+  }
 
-
-if (!struct || !value || value.structName !== structName || value.value.kind !== "Struct") {
-  return <div className="loading-message">Loading form...</div>;
-}
+  const purgeDependentMatches = (discriminantName: string, map: Map<string, Value>) => {
+    for (const [fieldName, fieldType] of struct.fields) {
+      if (fieldType.kind === "Match" && fieldType.discriminant === discriminantName) {
+        map.delete(fieldName); // 🧹 remove stale field
+      }
+    }
+  };
 
   const handleFieldChange = (fieldName: string, fieldValue: Value) => {
-    if (!value || value.value.kind !== "Struct") return;
-    const updated = new Map(value.value.fields);
+    const updated = new Map(fields);
     updated.set(fieldName, fieldValue);
-    setValue({structName, value: { kind: "Struct", name: structName, fields: updated }});
+
+    const fieldType = struct.fields.find(([name]) => name === fieldName)?.[1];
+    if (fieldType?.kind === "Enum") {
+      purgeDependentMatches(fieldName, updated);
+    }
+
+    setFields(updated);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (value) {
-      onSubmit(value.value);
-    }
+    onSubmit({ kind: "Struct", fields, name: structName });
   };
-  const v = value.value;
+
   return (
     <div className="form-container">
       <h2 className="form-title">Building: {structName}</h2>
-      <div className="struct-size">Size: {expr.sizeof(structName)} bytes</div>
+      <div className="struct-size">
+        Size: {expr.sizeof({ kind: "Struct", name: structName })} bytes
+      </div>
 
       <form onSubmit={handleSubmit}>
-        {(
-          <div className="struct-container">
-            <div className="struct-header">
-              <span className="struct-name">{structName}</span>
-            </div>
-            <div className="struct-fields">
-              {struct.fields.map(([fieldName, fieldType]) => {
-                const field = v.fields.get(fieldName)!;
-                return (
-                <ValueInput
-                  key={fieldName}
-                  name={fieldName}
-                  type={fieldType}
-                  expr={expr}
-                  value={field}
-                  onChange={(v) => handleFieldChange(fieldName, v)}
-                  parentStruct = {v}
-                />)}
-              )}
-            </div>
+        <div className="struct-container">
+          <div className="struct-header">
+            <span className="struct-name">{structName}</span>
           </div>
-        )}
+          <div className="struct-fields">
+            {struct.fields.map(([fieldName, fieldType]) => (
+              <ValueInput
+                key={fieldName}
+                name={fieldName}
+                type={fieldType}
+                expr={expr}
+                onChange={(v) => handleFieldChange(fieldName, v)}
+                parentFields={fields}
+              />
+            ))}
+          </div>
+        </div>
 
         <div className="form-actions">
           <button
             type="submit"
-            disabled={!isSocketReady || !value}
-            className={`submit-button ${!isSocketReady || !value ? 'disabled' : ''}`}
+            disabled={!isSocketReady}
+            className={`submit-button ${!isSocketReady}`}
           >
-            {!isSocketReady
-              ? "WebSocket Disconnected"
-              : !value
-                ? "Fill Form to Submit"
-                : "Send to WebSocket"}
+            {!isSocketReady ? "WebSocket Disconnected" : "Send to WebSocket"}
           </button>
         </div>
       </form>
     </div>
   );
 };
+
 
 export default ValueForm;

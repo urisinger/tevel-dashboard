@@ -188,7 +188,6 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
 
   // Calculate size information
   const bufferSize = rawBytes ? rawBytes.length : 0;
-  const expectedSize = expr.sizeof(valueType) ;
 
   return (
     <div className="enhanced-buffer-viewer">
@@ -203,14 +202,6 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
             <span className="info-label">Size:</span>
             <span className="info-value">{bufferSize} bytes</span>
           </span>
-          {expectedSize !== undefined && (
-            <span className="info-item">
-              <span className="info-label">Expected Size:</span>
-              <span className={`info-value ${bufferSize !== expectedSize ? 'size-mismatch' : ''}`}>
-                {expectedSize} bytes
-              </span>
-            </span>
-          )}
         </div>
       </div>
       

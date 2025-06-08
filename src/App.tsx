@@ -77,7 +77,7 @@ const App: React.FC<AppProps> = ({ expr }) => {
           <option value="">Select a Layout</option>
           {Array.from(expr.structs.keys()).map((key) => (
             <option key={key} value={key}>
-              {key} ({expr.sizeof(key)} bytes)
+              {key} ({expr.sizeof({kind: "Struct", name: key})} bytes)
             </option>
           ))}
         </select>

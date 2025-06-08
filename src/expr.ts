@@ -66,182 +66,204 @@ static parse(input: string): Expr {
     return this.enums.get(name);
   }
 
-  sizeof(name: string): number {
-    const struct = this.get(name);
-    if (!struct) throw new Error(`Unknown struct: ${name}`);
-    return struct.fields.reduce((sum, [, t]) => {const size = this.sizeOfType(t);return sum + size;}, 0);
-  }
-
-sizeOfType(type: FieldType): number {
-  switch (type.kind) {
-    case "i8": return 1;
-    case "i16": return 2;
-    case "i32": return 4;
-    case "i64": return 8;
-    case "f32": return 4;
-    case "f64": return 8;
-
-    case "Enum":
-      return this.sizeOfType({ kind: type.base });
-
-    case "Struct": {
-      const struct = this.get(type.name);
-
-      if (!struct) throw new Error(`Unknown struct: ${type.name}`);
-      return struct.fields.reduce((sum, [, t]) => {const size = this.sizeOfType(t); return sum + size;}, 0);
-    }
-
-    case "Match": {
-      let maxSize = 0;
-      for (const variantType of type.cases.values()) {
-        const size = this.sizeOfType(variantType);
-        maxSize = Math.max(maxSize, size);
-      }
-      return maxSize;
-    }
-  }
-}
-
-
-  sizeOfValue(value: Value): number {
-    switch (value.kind) {
-      case "i8": return 1;
+  /**
+   * Returns the maximun size (in bytes) of `type`.
+   * – If you also pass a partially‑filled `value`, the exact size of the data
+   *   in that value is used for Match/Struct discrimination.
+   * – If a field is missing, or you don’t supply a value at all, it falls back
+   *   to the *maximum* size for that field‑type.
+   */
+  sizeof(
+    type: FieldType,
+    value?: Value,
+    parentFields: Map<string, Value> | null = null
+  ): number {
+    switch (type.kind) {
+      // ── primitives ─────────────────────────────
+      case "i8":  return 1;
       case "i16": return 2;
       case "i32": return 4;
       case "i64": return 8;
       case "f32": return 4;
       case "f64": return 8;
-      case "Enum": return this.sizeOfType({ kind: value.base });
-      case "Struct": return Array.from(value.fields).reduce((sum, [, v]) => sum + this.sizeOfValue(v), 0);
-    }
-  }
 
-  encodeValue(value: Value): Uint8Array {
-    const buf = new Uint8Array(this.sizeOfValue(value));
-    const written = this.writeValue(value, buf);
-    if (written !== buf.length) {
-      console.warn(`Expected to write ${buf.length} bytes, but wrote ${written}`);
-    }
-    return buf;
-  }
+      // ── enum  (size depends only on base) ──────
+      case "Enum":
+        return this.sizeof({ kind: type.base });
 
-  writeValue(value: Value, buf: Uint8Array): number {
-    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-    let offset = 0;
-
-    const writeInt = (val: number | bigint, size: number) => {
-      switch (size) {
-        case 1: dv.setInt8(offset, Number(val)); break;
-        case 2: dv.setInt16(offset, Number(val), true); break;
-        case 4: dv.setInt32(offset, Number(val), true); break;
-        case 8: dv.setBigInt64(offset, BigInt(val), true); break;
-      }
-      offset += size;
-    };
-
-    switch (value.kind) {
-      case "i8": writeInt(value.value, 1); break;
-      case "i16": writeInt(value.value, 2); break;
-      case "i32": writeInt(value.value, 4); break;
-      case "i64": writeInt(value.value, 8); break;
-      case "f32": dv.setFloat32(offset, value.value, true); offset += 4; break;
-      case "f64": dv.setFloat64(offset, value.value, true); offset += 8; break;
-      case "Enum": {
-        const enumMap = this.getEnum(value.name);
-        if (!enumMap) throw new Error(`Enum '${value.name}' not found`);
-        const num = enumMap.get(value.value);
-        if (num === undefined) throw new Error(`Enum value '${value.value}' not found`);
-        writeInt(num, this.sizeOfType({ kind: value.base }));
-        break;
-      }
+      // ── struct  (iterates declared fields) ─────
       case "Struct": {
-        const struct = this.get(value.name);
-        if (!struct) throw new Error(`Unknown struct: ${value.name}`);
-        
-        // Write fields in the order defined by the struct
+        const struct = this.get(type.name);
+        if (!struct) throw new Error(`Unknown struct '${type.name}'`);
+
+        // If we *do* have a matching Value, expose its field‑map to children
+        const fieldMap =
+          value?.kind === "Struct" && value.name === type.name
+            ? value.fields
+            : null;
+
+        let total = 0;
         for (const [fieldName, fieldType] of struct.fields) {
-          const fieldValue = value.fields.get(fieldName);
-          if (!fieldValue) throw new Error(`Missing field ${fieldName} in struct ${value.name}`);
-          offset += this.writeValue(fieldValue, buf.subarray(offset));
+          const fieldVal = fieldMap?.get(fieldName);
+          total += this.sizeof(
+            fieldType,
+            fieldVal,
+            fieldMap                        // pass down for Match resolution
+          );
         }
-        break;
+        return total;
+      }
+
+      // ── match  (resolve by discriminant, else worst‑case) ──────────
+      case "Match": {
+        // 1. If we have parentFields → look up discriminant Enum
+        const discrVal = parentFields?.get(type.discriminant);
+        if (discrVal?.kind === "Enum") {
+          const caseType = type.cases.get(discrVal.value);
+          if (!caseType)
+            throw new Error(
+              `No case in match for enum value '${discrVal.value}'`
+            );
+          const innerVal = (value?.kind !== "Struct") ? value : undefined;
+          return this.sizeof(caseType, innerVal, parentFields);
+        }
+
+        // 2. Otherwise (or discriminant missing) → return **max** case size
+        let max = 0;
+        for (const ct of type.cases.values()) {
+          max = Math.max(max, this.sizeof(ct, undefined, parentFields));
+        }
+        return max;
       }
     }
-
-    return offset;
   }
+
+
+encodeValue(value: Value): Uint8Array {
+  // start small; will grow automatically
+  let buf   = new Uint8Array(32);
+  let bytes = this.writeValueHelper(value, buf, 0);
+
+  // slice to exact length
+  return buf.subarray(0, bytes);
+}
+
+
+  writeValueHelper(
+  value: Value,
+  buf: Uint8Array,
+  offset: number
+): number /* new offset */ {
+  // helper that ensures capacity
+  const need = (n: number) => {
+    if (offset + n > buf.length) {
+      const bigger = new Uint8Array(Math.max(buf.length * 2, offset + n));
+      bigger.set(buf);
+      buf = bigger;                               // replace closed‑over ref
+    }
+  };
+
+  const dv = new DataView(buf.buffer);
+
+  const putInt = (val: number | bigint, size: 1 | 2 | 4 | 8) => {
+    need(size);
+    switch (size) {
+      case 1: dv.setInt8 (offset, Number(val));           break;
+      case 2: dv.setInt16(offset, Number(val), true);     break;
+      case 4: dv.setInt32(offset, Number(val), true);     break;
+      case 8: dv.setBigInt64(offset, BigInt(val), true);  break;
+    }
+    offset += size;
+  };
+
+  switch (value.kind) {
+    case "i8":  putInt(value.value, 1); break;
+    case "i16": putInt(value.value, 2); break;
+    case "i32": putInt(value.value, 4); break;
+    case "i64": putInt(value.value, 8); break;
+    case "f32": need(4); dv.setFloat32(offset, value.value, true); offset += 4; break;
+    case "f64": need(8); dv.setFloat64(offset, value.value, true); offset += 8; break;
+
+    case "Enum": {
+      const enumMap = this.getEnum(value.name);
+      if (!enumMap) throw new Error(`Enum '${value.name}' not found`);
+      const num = enumMap.get(value.value);
+      if (num === undefined) throw new Error(`Enum variant '${value.value}' not found`);
+      putInt(num, this.sizeof({ kind: value.base }) as 1 | 2 | 4 | 8);
+      break;
+    }
+
+    case "Struct": {
+      const struct = this.get(value.name);
+      if (!struct) throw new Error(`Unknown struct '${value.name}'`);
+
+      for (const [fname, ftype] of struct.fields) {
+        const fval = value.fields.get(fname) ?? this.defaultValue(ftype, value.fields);
+        offset = this.writeValueHelper(fval, buf, offset); // may grow & return new offset
+      }
+      break;
+    }
+  }
+
+  return offset;
+}
 
   readValue(buf: ArrayBuffer, layoutName: string): Value | null {
     const result = this.readValueHelper(buf, layoutName);
     return result ? result[0] : null;
   }
 
-  defaultValue(type: FieldType): Value {
-    switch (type.kind) {
-      case "i8": return { kind: "i8", value: 0 };
-      case "i16": return { kind: "i16", value: 0 };
-      case "i32": return { kind: "i32", value: 0 };
-      case "i64": return { kind: "i64", value: BigInt(0) };
-      case "f32": return { kind: "f32", value: 0 };
-      case "f64": return { kind: "f64", value: 0 };
+defaultValue(
+  type: FieldType,
+  parentFields: Map<string, Value> | null = null
+): Value {
+  switch (type.kind) {
+    case "i8":  return { kind: "i8",  value: 0 };
+    case "i16": return { kind: "i16", value: 0 };
+    case "i32": return { kind: "i32", value: 0 };
+    case "i64": return { kind: "i64", value: 0n };
+    case "f32": return { kind: "f32", value: 0 };
+    case "f64": return { kind: "f64", value: 0 };
 
-      case "Enum": {
-        const enumDef = this.getEnum(type.name);
-        if (!enumDef || enumDef.size === 0) {
-          throw new Error(`Enum '${type.name}' not found or is empty`);
-        }
-        const firstValue = Array.from(enumDef.keys())[0];
-        return {
-          kind: "Enum",
-          name: type.name,
-          base: type.base,
-          value: firstValue,
-        };
+    case "Enum": {
+      const enumDef = this.getEnum(type.name);
+      if (!enumDef || enumDef.size === 0)
+        throw new Error(`Enum '${type.name}' not found or empty`);
+      const firstKey = Array.from(enumDef.keys())[0];
+      return { kind: "Enum", name: type.name, base: type.base, value: firstKey };
+    }
+
+    case "Struct": {
+      const struct = this.get(type.name);
+      if (!struct) throw new Error(`Struct '${type.name}' not found`);
+
+      const fields = new Map<string, Value>();
+
+      for (const [fieldName, fieldType] of struct.fields) {
+        const fieldVal =
+            this.defaultValue(fieldType, fields) ;
+        fields.set(fieldName, fieldVal);
       }
 
-      case "Struct":
-        return this.defaultStructValue(type.name);
+      return { kind: "Struct", name: type.name, fields };
+    }
 
-      case "Match":
+    case "Match": {
+      const discr = parentFields?.get(type.discriminant);
+      const key =
+        discr?.kind === "Enum"
+          ? discr.value
+          : Array.from(type.cases.keys())[0]; // fallback to first entry
+      const variantType = type.cases.get(key);
+      if (!variantType)
         throw new Error(
-          `defaultValue(type: Match) must be resolved in a struct context using defaultStructValue()`
+          `No variant in match '${type.discriminant}' for enum value '${key}'`
         );
+      return this.defaultValue(variantType, parentFields);
     }
   }
+}
 
-  defaultStructValue(structName: string): Value {
-    const struct = this.get(structName);
-    if (!struct) throw new Error(`Struct '${structName}' not found`);
-
-    const fields = new Map<string, Value>();
-
-    // First pass: set simple fields and Enums
-    for (const [name, type] of struct.fields) {
-      if (type.kind !== "Match") {
-        fields.set(name, this.defaultValue(type));
-      }
-    }
-
-    // Second pass: resolve Match fields using the Enum discriminant
-    for (const [name, type] of struct.fields) {
-      if (type.kind === "Match") {
-        const discrim = fields.get(type.discriminant);
-        if (!discrim || discrim.kind !== "Enum") {
-          throw new Error(`Missing or invalid discriminant for match field '${name}'`);
-        }
-
-        const variantType = type.cases.get(discrim.value);
-        if (!variantType) {
-          throw new Error(`No case in match for discriminant value '${discrim.value}'`);
-        }
-
-        const matchValue = this.defaultValue(variantType);
-        fields.set(name, matchValue);
-      }
-    }
-
-    return { kind: "Struct", name: structName, fields };
-  }
 
 
 
@@ -268,7 +290,7 @@ sizeOfType(type: FieldType): number {
       case "Enum": {
         const enumMap = this.getEnum(type.name);
         if (!enumMap) return null;
-        const size = this.sizeOfType({ kind: type.base });
+        const size = this.sizeof({ kind: type.base });
         const raw = readInt(size);
         const entry = [...enumMap.entries()].find(([, num]) => typeof raw === "bigint" ? BigInt(num) === raw : num === raw);
         return [{
