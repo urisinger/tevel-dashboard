@@ -21,11 +21,36 @@ FieldList
   = f:Field* { return f; }
 
 Field
-  = _ name:Identifier _ ":" _ base:Identifier _ param:BackingType? _ ","? _ {
-      return param
-        ? [name, { kind: param, enum: base }]
-        : [name, base];
+  = _ name:Identifier _ ":" field:(MatchField / FieldType) _ ","? {
+    return [name, field]
+  }
+
+MatchField
+  =  _ "match" __ discrim:Identifier _ "{" _ cases:MatchCaseList _ "}" _ {
+      return { kind: "Match", discriminant: discrim, cases: new Map(cases) };
     }
+
+FieldType
+  =  _ base:Identifier _ param:BackingType?  _ {
+      if (param) {
+        return { kind: "Enum", name: base, base: param.toLowerCase() };
+      } else {
+        switch (base) {
+          case "i8": case "i16": case "i32": case "i64":
+          case "f32": case "f64":
+            return { kind: base };
+          default:
+            return  { kind: "Struct", name: base };
+        }
+      }
+    }
+
+
+MatchCaseList
+  = c:MatchCase* { return c; }
+
+MatchCase
+  = _ tag:Identifier _ "=>" _ typ:FieldType _ ","? _ { return [tag, typ]; }
 
 BackingType
   = "(" _ base:Identifier _ ")" { return base; }
@@ -44,5 +69,5 @@ Integer
 Identifier
   = [a-zA-Z_][a-zA-Z0-9_]* { return text(); }
 
-_  = [ \t\n\r]*      // optional whitespace
-__ = [ \t\n\r]+      // required whitespace
+_  = [ \t\n\r]*    // optional whitespace
+__ = [ \t\n\r]+    // required whitespace

@@ -44,18 +44,18 @@ const PrimitiveViewer: React.FC<{ value: Value }> = ({ value }) => {
   let typeClass: string;
 
   switch (value.kind) {
-    case "I8":
-    case "I16":
-    case "I32":
+    case "i8":
+    case "i16":
+    case "i32":
       displayValue = value.value.toString();
       typeClass = "integer-value";
       break;
-    case "I64":
+    case "i64":
       displayValue = value.value.toString();
       typeClass = "bigint-value";
       break;
-    case "F32":
-    case "F64":
+    case "f32":
+    case "f64":
       // Format floating point to 4 decimal places if needed
       displayValue = 
         value.value % 1 === 0 
@@ -67,9 +67,6 @@ const PrimitiveViewer: React.FC<{ value: Value }> = ({ value }) => {
       displayValue = value.value;
       typeClass = "enum-value";
       break;
-    default:
-      displayValue = "Unknown type";
-      typeClass = "unknown-value";
   }
 
   return (
@@ -153,8 +150,6 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
   expr, 
   valueType 
 }) => {
-
-  console.log("rerender");
   const [parsedValue, setParsedValue] = useState<Value | null>(null);
   const [rawBytes, setRawBytes] = useState<Uint8Array | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -263,15 +258,8 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
         {activeTab === 'json' && parsedValue && (
           <div className="json-view">
             <pre>
-              {JSON.stringify(parsedValue, (key, value) => {
-                if (typeof value === 'bigint') {
-                  return value.toString();
-                }
-                if (value instanceof Map) {
-                  return Object.fromEntries(value);
-                }
-                return value;
-              }, 2)}
+              {JSON.stringify(parsedValue, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value, 2)}
             </pre>
           </div>
         )}

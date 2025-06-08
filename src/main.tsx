@@ -4,24 +4,27 @@ import './index.css'
 import App from './App.tsx'
 
 
-import { parser ,Expr, FieldType, Struct} from "./expr.ts"; // Your generated parser from Peggy/PEG.js
+import { Expr, FieldType, Struct} from "./expr.ts"; // Your generated parser from Peggy/PEG.js
 
 // The input string to parse.
 const input = `
   struct Person {
     type: i32,
     height: f64,
-    name: i8
   }
 
   struct Employee {
     id: i64,
     l: T(i8),
-    person: Person,
+    person: match l {
+      Lol => Person,
+      V => i8
+    }
   }
 
   enum T{
     Lol = 1,
+    V = 2
   }
 `;
 
