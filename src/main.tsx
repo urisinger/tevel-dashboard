@@ -1,37 +1,51 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { Expr } from "./expr.ts";
 
+function Main() {
+  const [expr, setExpr] = useState<Expr | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-import { Expr, FieldType, Struct} from "./expr.ts"; // Your generated parser from Peggy/PEG.js
-
-// The input string to parse.
-const input = `
-  struct Person {
-    type: i32,
-    height: f64,
-  }
-
-  struct Employee {
-    id: i64,
-    l: T(i8),
-    person: match l {
-      Lol => Person,
-      V => i8
+  useEffect(() => {
+    async function loadStructDefinition() {
+      try {
+        const response = await fetch('/struct.def');
+        if (!response.ok) {
+          throw new Error(`Failed to load struct definition: ${response.statusText}`);
+        }
+        const input = await response.text();
+        const parsedExpr = Expr.parse(input);
+        setExpr(parsedExpr);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load struct definition');
+      } finally {
+        setLoading(false);
+      }
     }
+
+    loadStructDefinition();
+  }, []);
+
+  if (loading) {
+    return <div className="loading">Loading struct definition...</div>;
   }
 
-  enum T{
-    Lol = 1,
-    V = 2
+  if (error) {
+    return <div className="error">Error: {error}</div>;
   }
-`;
 
-const expr = Expr.parse(input);
+  if (!expr) {
+    return <div className="error">No struct definition available</div>;
+  }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App expr={expr}/>
-  </StrictMode>,
-)
+  return (
+    <StrictMode>
+      <App expr={expr}/>
+    </StrictMode>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<Main />);

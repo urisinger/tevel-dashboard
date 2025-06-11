@@ -21,39 +21,44 @@ FieldList
   = f:Field* { return f; }
 
 Field
-  = _ name:Identifier _ ":" field:(MatchField / FieldType) _ ","? {
+  = _ name:Identifier _ ":" field:Type _ ","? {
     return [name, field]
   }
 
-MatchField
+Type 
+  = (BasicType / MatchType / EnumType / StructType ) 
+
+BasicType
+  = _ kind:("i8" / "i16" / "i32" / "i64" / "f32" / "f64" ) {
+    return {kind}
+  }
+
+StructType
+  =  _ base:Identifier _ {
+      return  { kind: "Struct", name: base };  
+    }
+
+
+EnumType
+  =  _ base:Identifier _ "(" _ param:Identifier _ ")"  _ {
+      return { kind: "Enum", name: base, base: param.toLowerCase() };
+    }
+
+
+
+MatchType
   =  _ "match" __ discrim:Identifier _ "{" _ cases:MatchCaseList _ "}" _ {
       return { kind: "Match", discriminant: discrim, cases: new Map(cases) };
     }
 
-FieldType
-  =  _ base:Identifier _ param:BackingType?  _ {
-      if (param) {
-        return { kind: "Enum", name: base, base: param.toLowerCase() };
-      } else {
-        switch (base) {
-          case "i8": case "i16": case "i32": case "i64":
-          case "f32": case "f64":
-            return { kind: base };
-          default:
-            return  { kind: "Struct", name: base };
-        }
-      }
-    }
 
 
 MatchCaseList
   = c:MatchCase* { return c; }
 
 MatchCase
-  = _ tag:Identifier _ "=>" _ typ:FieldType _ ","? _ { return [tag, typ]; }
+  = _ tag:Identifier _ "=>" _ typ:Type _ ","? _ { return [tag, typ]; }
 
-BackingType
-  = "(" _ base:Identifier _ ")" { return base; }
 
 EnumEntryList
   = e:EnumEntry* { return e; }

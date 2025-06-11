@@ -14,8 +14,6 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ expr }) => {
-  const [selectedLayout, setSelectedLayout] = useState<string | null>(null);
-  
   const { sendMessage, lastMessage, readyState } = useWebSocket("ws://localhost:8080", {
     protocols: ["websocket-to-tcp"],
     shouldReconnect: () => true,
@@ -41,12 +39,6 @@ const App: React.FC<AppProps> = ({ expr }) => {
   };
 
   const onSubmit = (value: Value) => {
-    if (!selectedLayout) return;
-
-    const layout = expr.get(selectedLayout);
-    if (!layout) return;
-    
-    
     try {
       const bytes = expr.encodeValue(value);
       const encoded = Array.from(bytes, function(byte) {
@@ -59,55 +51,59 @@ const App: React.FC<AppProps> = ({ expr }) => {
     }
   };
 
+  const mainType = { kind: "Struct" as const, name: "Main" };
+  const minSize = expr.minSizeOf(mainType);
+  const maxSize = expr.maxSizeOf(mainType);
+  const sizeRange = minSize === maxSize ? `${minSize} bytes` : `${minSize}-${maxSize} bytes`;
+
   return (
     <div className="app-container">
-      <div className="app-header">
-        <h1 className="app-title">Data Structure Builder</h1>
-        <p className="app-subtitle">Build and transmit binary data structures</p>
-      </div>
-      
-      <div className="layout-selector-container">
-        <select
-          className="layout-selector"
-          onChange={(ev) => {
-            setSelectedLayout(ev.target.value);
-          }}
-          value={selectedLayout || ""}
-        >
-          <option value="">Select a Layout</option>
-          {Array.from(expr.structs.keys()).map((key) => (
-            <option key={key} value={key}>
-              {key} ({expr.sizeof({kind: "Struct", name: key})} bytes)
-            </option>
-          ))}
-        </select>
-        
-        <span className={`socket-status ${isSocketReady ? 'connected' : 'disconnected'}`}>
-          <span className={`socket-status-indicator ${isSocketReady ? 'connected' : 'disconnected'}`}></span>
-          WebSocket: {getConnectionStatusText()}
-        </span>
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <h2>Dashboard</h2>
+        </div>
+        <div className="sidebar-content">
+          <div className="sidebar-item active">
+            <span>Main Screen</span>
+          </div>
+        </div>
       </div>
       
       <div className="main-content">
-        <div className="form-panel">
-          {selectedLayout && (
+        <div className="app-header">
+          <div className="header-top">
+            <h1 className="app-title">Data Structure Builder</h1>
+            <div className="size-info">
+              <span className="size-label">Size:</span>
+              <span className="size-value">{sizeRange}</span>
+            </div>
+          </div>
+          <p className="app-subtitle">Build and transmit binary data structures</p>
+          <span className={`socket-status ${isSocketReady ? 'connected' : 'disconnected'}`}>
+            <span className={`socket-status-indicator ${isSocketReady ? 'connected' : 'disconnected'}`}></span>
+            WebSocket: {getConnectionStatusText()}
+          </span>
+        </div>
+        
+        <div className="content-area">
+          <div className="form-panel">
             <ValueForm
-              structName={selectedLayout}
+              structName="Main"
               expr={expr}
               isSocketReady={isSocketReady}
               onSubmit={onSubmit}
             />
-          )}
-        </div>
-        
-        <div className="viewer-panel">
-          {lastMessage && selectedLayout && (
-            <BufferViewer
-              blob={lastMessage.data}
-              expr={expr}
-              valueType={selectedLayout}
-            />
-          )}
+          </div>
+          
+          <div className="viewer-panel">
+            {lastMessage && (
+              <BufferViewer
+                blob={lastMessage.data}
+                expr={expr}
+                valueType="Main"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

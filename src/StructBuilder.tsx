@@ -323,11 +323,16 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     onSubmit({ kind: "Struct", fields, name: structName });
   };
 
+  const currentSize = expr.sizeOf({ kind: "Struct", name: structName }, { 
+    value: { kind: "Struct" as const, name: structName, fields }, 
+    mode: "default" 
+  });
+
   return (
     <div className="form-container">
       <h2 className="form-title">Building: {structName}</h2>
       <div className="struct-size">
-        Size: {expr.sizeof({ kind: "Struct", name: structName })} bytes
+        Current Size: {currentSize} bytes
       </div>
 
       <form onSubmit={handleSubmit}>
