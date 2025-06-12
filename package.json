@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run backend:build && concurrently \"vite\" \"npm run backend:run\"",
+    "dev": "concurrently \"vite\" \"npm run backend:run\"",
     "build": "tsc -b && vite build && npm run backend:build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "backend:build": "cmake -S backend -B backend/build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 && cmake --build backend/build",
-    "backend:run": "backend/build/websocket_server ${WS_PORT:-8080} ${IN_SERVER_IP:-127.0.0.1} ${IN_SERVER_PORT:-9001} ${OUT_SERVER_IP:-127.0.0.1} ${OUT_SERVER_PORT:-9002}"
+    "backend:build": "cargo build --manifest-path=backend/Cargo.toml",
+    "backend:run": "cargo run --manifest-path=backend/Cargo.toml -- --ws-addr 0.0.0.0:${WS_PORT:-8080} --in-addr ${IN_SERVER_IP:-127.0.0.1}:${IN_SERVER_PORT:-9001} --out-addr ${OUT_SERVER_IP:-127.0.0.1}:${OUT_SERVER_PORT:-9002}"
   },
   "dependencies": {
     "@types/pegjs": "^0.10.6",

@@ -14,10 +14,11 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ expr }) => {
-  const { sendMessage, lastMessage, readyState } = useWebSocket("ws://localhost:8080", {
+  const { sendMessage, lastMessage, readyState } = useWebSocket(`ws://${window.location.host}/api/s`, {
     protocols: ["websocket-to-tcp"],
     shouldReconnect: () => true,
   });
+  
   
   const isSocketReady = readyState === ReadyState.OPEN;
   

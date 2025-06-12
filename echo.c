@@ -242,8 +242,8 @@ int setup_server_socket(int port) {
 
 int main(int argc, char *argv[]) {
     // These port numbers match the .env file configuration
-    int in_port = 9002;  // Matches IN_SERVER_PORT in .env
-    int out_port = 9001; // Matches OUT_SERVER_PORT in .env
+    int in_port = 9002;  // Matches OUT_SERVER_PORT in .env
+    int out_port = 9001; // Matches IN_SERVER_PORT in .env
     
     // Allow overriding via command line if needed
     if (argc == 3) {

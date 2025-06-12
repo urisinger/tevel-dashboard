@@ -358,7 +358,7 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
           <button
             type="submit"
             disabled={!isSocketReady}
-            className={`submit-button ${!isSocketReady}`}
+            className={`submit-button`}
           >
             {!isSocketReady ? "WebSocket Disconnected" : "Send to WebSocket"}
           </button>
