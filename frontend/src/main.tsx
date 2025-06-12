@@ -1,8 +1,12 @@
-import { StrictMode, useState, useEffect } from 'react'
+import React, { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Layout from "./Layout";
+import HistoryPage from "./pages/HistoryPage";
+import SendPage from './pages/SendPage'
+import { Expr } from "./expr";
+import { WebSocketProvider } from './contexts/WebSocketContext';
 import './index.css'
-import App from './App.tsx'
-import { Expr } from "./expr.ts";
 
 function Main() {
   const [expr, setExpr] = useState<Expr | null>(null);
@@ -43,7 +47,16 @@ function Main() {
 
   return (
     <StrictMode>
-      <App expr={expr}/>
+      <WebSocketProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<SendPage expr={expr} />} />
+              <Route path="history" element={<HistoryPage expr={expr} />} />
+            </Route>
+          </Routes>
+        </Router>
+      </WebSocketProvider>
     </StrictMode>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Expr, Value, FieldType, Struct } from "./expr";
+import { Expr, Value, FieldType, Struct } from "../expr";
 
+import './StructBuilder.css';
 
 const wrapInput = (name: string, typeKind: string, input: React.ReactNode) => (
   <div className="field-container">
@@ -36,7 +37,7 @@ const I16Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     />
   );
 
-const I32Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => void }) =>
+const I32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "I32",
     <input
       type="number"
@@ -46,7 +47,7 @@ const I32Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => v
     />
   );
 
-const I64Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => void }) =>
+const I64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "I64",
     <input
       type="number"
@@ -62,7 +63,7 @@ const I64Input = ({ name, onChange }: { name: string;  onChange: (v: Value) => v
     />
   );
 
-const F32Input = ({ name,  onChange }: { name: string;  onChange: (v: Value) => void }) =>
+const F32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "F32",
     <input
       type="number"
@@ -73,7 +74,7 @@ const F32Input = ({ name,  onChange }: { name: string;  onChange: (v: Value) => 
     />
   );
 
-const F64Input = ({ name,  onChange }: { name: string;  onChange: (v: Value) => void }) =>
+const F64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
   wrapInput(name, "F64",
     <input
       type="number"
@@ -123,7 +124,7 @@ const StructInput = ({
             name={fieldName}
             type={fieldType}
             expr={expr}
-            parentFields = {fields}
+            parentFields={fields}
             onChange={(v) => {
               const updated = new Map(fields);
               updated.set(fieldName, v);
@@ -172,13 +173,13 @@ const EnumInput = ({
   return wrapInput(name, enumName,
     <select
       className="field-input"
-      value = {selected}
+      value={selected}
       onChange={(e) => {
         const value = e.target.value;
         setSelected(value);
         if (value !== "") {
           onChange({ kind: "Enum", name: enumName, base, value });
-          
+
         }
       }}
     >
@@ -323,9 +324,9 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     onSubmit({ kind: "Struct", fields, name: structName });
   };
 
-  const currentSize = expr.sizeOf({ kind: "Struct", name: structName }, { 
-    value: { kind: "Struct" as const, name: structName, fields }, 
-    mode: "default" 
+  const currentSize = expr.sizeOf({ kind: "Struct", name: structName }, {
+    value: { kind: "Struct" as const, name: structName, fields },
+    mode: "default"
   });
 
   return (
