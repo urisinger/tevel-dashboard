@@ -10,11 +10,11 @@ interface SendPageProps {
 const SendPage: React.FC<SendPageProps> = ({ expr }) => {
   const { sendMessage, readyState } = useWebSocketContext();
 
-  const handleSubmit = (value: any) => {
+  const handleSubmit = (value) => {
     try {
       const bytes = expr.encodeValue(value, "Main");
       sendMessage(bytes);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Failed to encode value:', e);
     }
   };

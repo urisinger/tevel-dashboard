@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Expr, FieldType, Value, ValueMap } from "../expr";
+import { Expr, Value, ValueMap } from "../expr";
 import './BufferViewer.css';
 import StructViewer from "./StructViewer";
 

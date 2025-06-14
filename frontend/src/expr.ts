@@ -24,8 +24,6 @@ export interface Struct {
   fields: [string, FieldType][];
 }
 
-
-
 export class Expr {
   structs: { [structName: string]: Struct };
   enums: { [enumName: string]: Map<string, number> };
@@ -139,18 +137,24 @@ export class Expr {
           const lenField = parentFields?.[type.length.field];
           if (typeof lenField === "number") {
             length = lenField;
+          } else if (typeof lenField == "bigint") {
+            length = Number(lenField);
           } else {
             switch (mode) {
-              case "default":
               case "max":
                 length = 1;
                 break;
+              case "default":
               case "min":
                 length = 0;
                 break;
             }
           }
         }
+
+
+        length = Math.max(0, length);
+
 
         const elementSize = this.sizeOf(type.elementType, {
           value: undefined,
@@ -277,13 +281,14 @@ export class Expr {
             length = lenField;
           } else if (typeof lenField == "bigint") {
             length = Number(lenField);
-          }
-          else {
+          } else {
             length = 0;
           }
         } else {
           throw new Error("Invalid array length kind");
         }
+
+        length = Math.max(0, length);
 
         if (!Array.isArray(arr)) {
           throw new Error(`Expected array for field, got ${typeof arr}`);
@@ -463,6 +468,7 @@ export class Expr {
         } else {
           throw new Error("Invalid array length kind");
         }
+        length = Math.max(0, length);
 
         const values: Value[] = [];
         let offset = 0;

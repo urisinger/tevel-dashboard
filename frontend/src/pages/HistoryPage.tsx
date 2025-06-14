@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Expr } from "../expr";
 import BufferViewer from "../components/BufferViewer";
 import { useWebSocketContext } from "../contexts/WebSocketContext";
@@ -33,7 +33,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ expr }) => {
     const ws = getWebSocket();
     if (!ws || readyState !== ReadyState.OPEN) return;
 
-    const handleMessage = async (event: MessageEvent) => {
+    const handleMessage = async (event) => {
       if (event.data instanceof Blob) {
         const buffer = await event.data.arrayBuffer();
         setMessages(prev => [buffer, ...prev]);

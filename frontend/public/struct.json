@@ -70,11 +70,11 @@
               "discriminant": "l2",
               "enumTypeName": "T",
               "cases": {
-                "Lol": {
-                  "kind": "i8"
-                },
                 "V": {
                   "kind": "i32"
+                },
+                "Lol": {
+                  "kind": "i8"
                 }
               }
             },

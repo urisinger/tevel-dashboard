@@ -12,7 +12,7 @@ const wrapInput = (name: string, typeKind: string, input: React.ReactNode) => (
   </div>
 );
 
-const I8Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const I8Input = ({ name, onChange }: { name: string; onChange: (v: number) => void }) =>
   wrapInput(name, "I8",
     <input
       type="number"
@@ -25,7 +25,7 @@ const I8Input = ({ name, onChange }: { name: string; onChange: (v: Value) => voi
   );
 
 
-const I16Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const I16Input = ({ name, onChange }: { name: string; onChange: (v: number) => void }) =>
   wrapInput(name, "I16",
     <input
       type="number"
@@ -37,7 +37,7 @@ const I16Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     />
   );
 
-const I32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const I32Input = ({ name, onChange }: { name: string; onChange: (v: number) => void }) =>
   wrapInput(name, "I32",
     <input
       type="number"
@@ -47,7 +47,7 @@ const I32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     />
   );
 
-const I64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const I64Input = ({ name, onChange }: { name: string; onChange: (v: bigint) => void }) =>
   wrapInput(name, "I64",
     <input
       type="number"
@@ -63,7 +63,7 @@ const I64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     />
   );
 
-const F32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const F32Input = ({ name, onChange }: { name: string; onChange: (v: number) => void }) =>
   wrapInput(name, "F32",
     <input
       type="number"
@@ -74,7 +74,7 @@ const F32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     />
   );
 
-const F64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => void }) =>
+const F64Input = ({ name, onChange }: { name: string; onChange: (v: number) => void }) =>
   wrapInput(name, "F64",
     <input
       type="number"
@@ -94,7 +94,7 @@ const StructInput = ({
   name: string;
   struct: Struct;
   expr: Expr;
-  onChange: (v: Value) => void;
+  onChange: (v: ValueMap) => void;
 }) => {
   const [fields, setFields] = useState<ValueMap>({});
 
@@ -161,7 +161,7 @@ const ArrayInput = ({
   length: ArrayLength;
   expr: Expr;
   parentFields: ValueMap;
-  onChange: (v: Value) => void;
+  onChange: (v: Value[]) => void;
 }) => {
 
   const computedLength = useMemo(() => {
@@ -224,7 +224,7 @@ const EnumInput = ({
   name: string;
   enumName: string;
   expr: Expr;
-  onChange: (v: Value) => void;
+  onChange: (v: string) => void;
 }) => {
   const enumDef = expr.getEnum(enumName);
 
@@ -406,7 +406,7 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
           name={structName}
           struct={struct}
           expr={expr}
-          onChange={setFields}
+          onChange={(value) => setFields(value)}
         />
 
         <div className="form-actions">
