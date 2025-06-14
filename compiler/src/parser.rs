@@ -50,6 +50,7 @@ pub enum FieldType {
     F32,
     #[serde(rename = "f64")]
     F64,
+    CString,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -132,6 +133,7 @@ fn field_type_parser<'a>(
             Token::I64 => FieldType::I64,
             Token::F32 => FieldType::F32,
             Token::F64 => FieldType::F64,
+            Token::CString => FieldType::CString,
         };
 
         let struct_type = ident.map(|name| FieldType::Struct { name });

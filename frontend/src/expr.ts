@@ -1,6 +1,14 @@
 export type ValueMap = { [k: string]: Value };
 
-export type Value = ValueMap | Value[] | number | bigint | string;
+export type Value =
+  // Struct
+  ValueMap |
+  // Array
+  Value[] |
+  // i8, i16, i32, i64, f32, f64
+  number | bigint |
+  // Enum
+  string;
 
 function isValueMap(v: Value): v is ValueMap {
   return typeof v === "object" && v !== null;
@@ -11,6 +19,7 @@ export type ArrayLength = { kind: "Static", value: number } | { kind: "Dynamic",
 export type FieldType =
   | { kind: "Struct"; name: string }
   | { kind: "Array", elementType: FieldType, length: ArrayLength }
+  | { kind: "CString" }
   | { kind: "Enum"; name: string; base: "i8" | "i16" | "i32" | "i64" }
   | { kind: "Match", discriminant: string; enumTypeName: string; cases: { [caseName: string]: FieldType } }
   | { kind: "i8" }
@@ -119,7 +128,6 @@ export class Expr {
           });
         }
 
-        // ── "min" or "max" ──
         let best = mode === "max" ? 0 : Infinity;
         for (const ct of Object.values(type.cases)) {
           const size = this.sizeOf(ct, { value: undefined, parentFields, mode });
@@ -142,8 +150,7 @@ export class Expr {
           } else {
             switch (mode) {
               case "max":
-                length = 1;
-                break;
+                return Infinity;
               case "default":
               case "min":
                 length = 0;
@@ -164,12 +171,26 @@ export class Expr {
 
         return length * elementSize;
       }
+      case "CString": {
+        if (typeof value == "string") {
+          const encoded = new TextEncoder().encode(value);
+          return encoded.length;
+        } else {
+          switch (mode) {
+            case "default":
+            case "min":
+              return 0;
+            case "max":
+              return Infinity;
+          }
+        }
+      }
       default:
         return this.sizeOfPrimitive(type.kind);
     }
   }
 
-  sizeOfPrimitive(kind: "i8" | "i16" | "i32" | "i64" | "f32" | "f64"): number {
+  sizeOfPrimitive(kind: "i8" | "i16" | "i32" | "i64" | "f32" | "f64"): 1 | 2 | 4 | 8 {
     switch (kind) {
       case "i8": return 1;
       case "i16": return 2;
@@ -243,7 +264,7 @@ export class Expr {
         if (!enumMap) throw new Error(`Enum '${type.name}' not found`);
         const num = enumMap.get(value as string);
         if (num === undefined) throw new Error(`Enum variant '${value}' not found`);
-        putInt(num, this.maxSizeOf({ kind: type.base }) as 1 | 2 | 4 | 8);
+        putInt(num, this.sizeOfPrimitive(type.base));
         break;
       }
       case "Match": {
@@ -303,14 +324,35 @@ export class Expr {
         }
         break;
       }
+      case "CString": {
+        if (typeof value !== "string") {
+          throw new Error(`Expected string for CString, got ${typeof value}`);
+        }
+
+        const encoded = new TextEncoder().encode(value);
+        for (const byte of encoded) {
+          out.push(byte);
+        }
+
+        out.push(0);
+        break;
+      }
     }
   }
 
 
   readValue(buf: ArrayBuffer, layoutName: string): Value | undefined {
     const result = this.readByType(buf, { kind: "Struct", name: layoutName });
-    return result ? result[0] : undefined;
+    if (!result) return undefined;
+
+    const [value, bytesRead] = result;
+    if (bytesRead !== buf.byteLength) {
+      console.error(`Buffer length mismatch: read ${bytesRead} bytes but buffer has ${buf.byteLength} bytes`);
+    }
+
+    return value;
   }
+
 
   defaultValue(
     type: FieldType,
@@ -373,6 +415,9 @@ export class Expr {
           this.defaultValue(type.elementType, parentFields)
         );
       }
+      case "CString": {
+        return ""
+      }
     }
   }
 
@@ -380,7 +425,8 @@ export class Expr {
   private readByType(buf: ArrayBuffer, type: FieldType, parentFields?: ValueMap): [Value, number] | undefined {
     const dv = new DataView(buf);
 
-    const readInt = (size: number): number | bigint => {
+    const readInt = (size: number): number | bigint | undefined => {
+      if (buf.byteLength < size) return undefined;
       switch (size) {
         case 1: return dv.getInt8(0);
         case 2: return dv.getInt16(0, true);
@@ -391,31 +437,35 @@ export class Expr {
     };
 
     switch (type.kind) {
-      case "i8": return [dv.getInt8(0), 1];
-      case "i16": return [dv.getInt16(0, true), 2];
-      case "i32": return [dv.getInt32(0, true), 4];
-      case "i64": return [dv.getBigInt64(0, true), 8];
-      case "f32": return [dv.getFloat32(0, true), 4];
-      case "f64": return [dv.getFloat64(0, true), 8];
+      case "i8":
+        if (buf.byteLength < 1) return undefined;
+        return [dv.getInt8(0), 1];
+      case "i16":
+        if (buf.byteLength < 2) return undefined;
+        return [dv.getInt16(0, true), 2];
+      case "i32":
+        if (buf.byteLength < 4) return undefined;
+        return [dv.getInt32(0, true), 4];
+      case "i64":
+        if (buf.byteLength < 8) return undefined;
+        return [dv.getBigInt64(0, true), 8];
+      case "f32":
+        if (buf.byteLength < 4) return undefined;
+        return [dv.getFloat32(0, true), 4];
+      case "f64":
+        if (buf.byteLength < 8) return undefined;
+        return [dv.getFloat64(0, true), 8];
+
       case "Enum": {
         const enumMap = this.getEnum(type.name);
-        if (!enumMap) {
-          throw new Error(`Enum '${type.name}' not found.`);
-        }
-
-        const size = this.maxSizeOf({ kind: type.base });
+        if (!enumMap) throw new Error(`Enum '${type.name}' not found.`);
+        const size = this.sizeOfPrimitive(type.base);
         const raw = readInt(size);
-
+        if (raw === undefined) return undefined;
         const entry = [...enumMap.entries()].find(([, num]) =>
           typeof raw === "bigint" ? BigInt(num) === raw : num === raw
         );
-
-        if (!entry) {
-          throw new Error(
-            `Unknown enum value '${raw}' for enum '${type.name}' (base ${type.base})`
-          );
-        }
-
+        if (!entry) throw new Error(`Unknown enum value '${raw}' for enum '${type.name}'`);
         return [entry[0], size];
       }
 
@@ -424,23 +474,22 @@ export class Expr {
         if (!struct) return undefined;
 
         let offset = 0;
-        const fields = {};
+        const fields: ValueMap = {};
 
-        for (const [fieldName, type] of struct.fields) {
-          let value: Value;
-          const result = this.readByType(buf.slice(offset), type, fields);
-          if (!result) return undefined;
-          result[1] += offset;
-          [value, offset] = result;
+        for (const [fieldName, fieldType] of struct.fields) {
+          if (offset >= buf.byteLength) return [fields, offset];
+          const result = this.readByType(buf.slice(offset), fieldType, fields);
+          if (!result) return [fields, offset];
+          const [value, size] = result;
           fields[fieldName] = value;
+          offset += size;
         }
 
         return [fields, offset];
       }
+
       case "Match": {
-        if (!parentFields) {
-          return undefined;
-        }
+        if (!parentFields) return undefined;
         const discrimVal = parentFields[type.discriminant];
         if (!discrimVal || typeof discrimVal !== "string") {
           throw new Error(`Discriminant '${type.discriminant}' not available or not string`);
@@ -449,6 +498,7 @@ export class Expr {
         if (!caseType) throw new Error(`No match case for '${discrimVal}'`);
         return this.readByType(buf, caseType, parentFields);
       }
+
       case "Array": {
         const elementType = type.elementType;
         let length: number;
@@ -461,22 +511,22 @@ export class Expr {
             length = dynLength;
           } else if (typeof dynLength == "bigint") {
             length = Number(dynLength);
-          }
-          else {
+          } else {
             throw new Error(`Dynamic array length field '${type.length.field}' missing or invalid`);
           }
         } else {
           throw new Error("Invalid array length kind");
         }
+
         length = Math.max(0, length);
 
         const values: Value[] = [];
         let offset = 0;
 
         for (let i = 0; i < length; i++) {
+          if (offset >= buf.byteLength) return [values, offset];
           const result = this.readByType(buf.slice(offset), elementType, parentFields);
-          if (!result) return undefined;
-
+          if (!result) return [values, offset];
           const [value, size] = result;
           values.push(value);
           offset += size;
@@ -484,6 +534,24 @@ export class Expr {
 
         return [values, offset];
       }
+
+      case "CString": {
+        let end = -1;
+
+        for (let i = 0; i < buf.byteLength; i++) {
+          if (dv.getUint8(i) === 0) {
+            end = i;
+            break;
+          }
+        }
+
+        if (end === -1) return undefined;
+
+        const strBytes = new Uint8Array(buf.slice(0, end));
+        const str = new TextDecoder().decode(strBytes);
+        return [str, end + 1];
+      }
     }
   }
+
 }

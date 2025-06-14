@@ -12,7 +12,7 @@
       [
         "height",
         {
-          "kind": "f64"
+          "kind": "i64"
         }
       ]
     ]
@@ -59,6 +59,12 @@
         }
       ],
       [
+        "s",
+        {
+          "kind": "CString"
+        }
+      ],
+      [
         "person",
         {
           "kind": "Match",
@@ -70,6 +76,9 @@
               "discriminant": "l2",
               "enumTypeName": "T",
               "cases": {
+                "H": {
+                  "kind": "i8"
+                },
                 "V": {
                   "kind": "i32"
                 },
@@ -77,6 +86,10 @@
                   "kind": "i8"
                 }
               }
+            },
+            "H": {
+              "kind": "Struct",
+              "name": "Person"
             },
             "Lol": {
               "kind": "Struct",
@@ -121,6 +134,10 @@
     "entries": [
       [
         "Lol",
+        0
+      ],
+      [
+        "H",
         1
       ],
       [

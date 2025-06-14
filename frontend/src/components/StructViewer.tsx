@@ -106,6 +106,7 @@ const StructViewer: React.FC<{
                     f32: "float-value",
                     f64: "float-value",
                     Enum: "enum-value",
+                    CString: "string-value"
                 };
 
                 const className = classMap[type.kind] || "unknown-value";

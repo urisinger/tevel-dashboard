@@ -85,6 +85,17 @@ const F64Input = ({ name, onChange }: { name: string; onChange: (v: number) => v
     />
   );
 
+const StringInput = ({ name, onChange }: { name: string; onChange: (v: string) => void }) =>
+  wrapInput(name, "String",
+    <input
+      type="text"
+      defaultValue=""
+      className="field-input string-value"
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+
+
 const StructInput = ({
   name,
   struct,
@@ -323,6 +334,8 @@ const ValueInput: React.FC<{
       return <F32Input name={name} onChange={onChange} />;
     case "f64":
       return <F64Input name={name} onChange={onChange} />;
+    case "CString":
+      return <StringInput name={name} onChange={onChange} />
     case "Struct": {
       const struct = expr.get(type.name);
       if (!struct)
@@ -389,9 +402,9 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     onSubmit(fields);
   };
 
-  const currentSize = expr.sizeOf(
+  const currentSize = expr.defaultSizeOf(
     { kind: "Struct", name: structName },
-    { value: fields, mode: "default" }
+    fields
   );
 
   return (

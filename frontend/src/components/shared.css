@@ -63,6 +63,10 @@
     border-left: 4px solid #3498db;
 }
 
+.string-value {
+    border-left: 4px solid #1abc9c;
+}
+
 .enum-value {
     border-left: 4px solid #f39c12;
 }

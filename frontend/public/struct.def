@@ -1,6 +1,6 @@
 struct Person {
   type: i32,
-  height: f64
+  height: i64
 }
 
 struct Employee {
@@ -8,10 +8,13 @@ struct Employee {
   l: T(i8),
   l2: T(i8),
   arr: [T(i8); id],
-  person: match l : T{
+  s: CString,
+  person: match l: T{
     Lol => Person,
-    V => match l2 : T {
+    H => Person,
+    V => match l2: T {
       Lol => i8,
+      H => i8,
       V => i32,
     }
   }
@@ -24,6 +27,7 @@ struct Main {
 }
 
 enum T {
-  Lol = 1,
+  Lol = 0,
+  H = 1,
   V = 2
 } 
