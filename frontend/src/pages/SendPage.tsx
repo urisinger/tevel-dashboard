@@ -1,7 +1,8 @@
 import React from 'react';
-import { Expr } from '../expr';
+import { Expr, Value } from '../expr';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
 import StructBuilder from '../components/StructBuilder';
+import { ReadyState } from 'react-use-websocket';
 
 interface SendPageProps {
   expr: Expr;
@@ -10,7 +11,7 @@ interface SendPageProps {
 const SendPage: React.FC<SendPageProps> = ({ expr }) => {
   const { sendMessage, readyState } = useWebSocketContext();
 
-  const handleSubmit = (value) => {
+  const handleSubmit = (value: Value) => {
     try {
       const bytes = expr.encodeValue(value, "Main");
       sendMessage(bytes);
@@ -24,8 +25,7 @@ const SendPage: React.FC<SendPageProps> = ({ expr }) => {
       <StructBuilder
         structName="Main"
         expr={expr}
-        isSocketReady={readyState === 1
-        }
+        isSocketReady={readyState === ReadyState.OPEN}
         onSubmit={handleSubmit}
       />
     </div >

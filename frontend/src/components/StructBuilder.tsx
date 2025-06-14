@@ -205,7 +205,7 @@ const ArrayInput = ({
       </div>
 
       <div className="struct-fields">
-        {items.map((value, i) => (
+        {items.map((_, i) => (
           <ValueInput
             key={i}
             name={`${name}[${i}]`}
@@ -296,7 +296,23 @@ const MatchInput: React.FC<{
       : expr.getEnum(type.enumTypeName)?.keys().next().value;
 
 
-  const selectedCase = type.cases[enumKey]!;
+  if (!enumKey) {
+    return (
+      <div className="error-message">
+        No valid enum key found for <strong>{type.discriminant}</strong>.
+      </div>
+    );
+  }
+
+  const selectedCase = type.cases[enumKey];
+
+  if (!selectedCase) {
+    return (
+      <div className="error-message">
+        No matching case for enum value <strong>{enumKey}</strong>.
+      </div>
+    );
+  }
 
 
   return (
@@ -335,6 +351,8 @@ const ValueInput: React.FC<{
     case "f64":
       return <F64Input name={name} onChange={onChange} />;
     case "CString":
+      return <StringInput name={name} onChange={onChange} />
+    case "HebrewString":
       return <StringInput name={name} onChange={onChange} />
     case "Struct": {
       const struct = expr.get(type.name);
@@ -435,7 +453,5 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     </div>
   );
 };
-
-
 
 export default ValueForm;

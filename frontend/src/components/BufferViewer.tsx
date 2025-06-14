@@ -160,7 +160,7 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
         {activeTab === 'json' && parsedValue && (
           <div className="json-view">
             <pre>
-              {JSON.stringify(parsedValue, (key, value) =>
+              {JSON.stringify(parsedValue, (_, value): unknown =>
                 typeof value === 'bigint' ? value.toString() : value, 2)}
             </pre>
           </div>

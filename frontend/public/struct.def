@@ -8,7 +8,7 @@ struct Employee {
   l: T(i8),
   l2: T(i8),
   arr: [T(i8); id],
-  s: CString,
+  s: HebrewString,
   person: match l: T{
     Lol => Person,
     H => Person,

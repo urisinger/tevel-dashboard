@@ -1,4 +1,6 @@
-export type ValueMap = { [k: string]: Value };
+import { HebrewDecoder, HebrewEncoder } from "./utils/hebrew";
+
+export type ValueMap = { [key: string]: Value };
 
 export type Value =
   // Struct
@@ -19,7 +21,6 @@ export type ArrayLength = { kind: "Static", value: number } | { kind: "Dynamic",
 export type FieldType =
   | { kind: "Struct"; name: string }
   | { kind: "Array", elementType: FieldType, length: ArrayLength }
-  | { kind: "CString" }
   | { kind: "Enum"; name: string; base: "i8" | "i16" | "i32" | "i64" }
   | { kind: "Match", discriminant: string; enumTypeName: string; cases: { [caseName: string]: FieldType } }
   | { kind: "i8" }
@@ -27,7 +28,9 @@ export type FieldType =
   | { kind: "i32" }
   | { kind: "i64" }
   | { kind: "f32" }
-  | { kind: "f64" };
+  | { kind: "f64" }
+  | { kind: "CString" }
+  | { kind: "HebrewString" };
 
 export interface Struct {
   fields: [string, FieldType][];
@@ -119,7 +122,8 @@ export class Expr {
         }
 
         if (mode === "default") {
-          const defaultVal = type.cases[this.getEnum(type.enumTypeName)?.keys().next().value];
+          const defaultEnumVal = this.getEnum(type.enumTypeName)?.keys().next().value;
+          const defaultVal = defaultEnumVal && type.cases[defaultEnumVal];
           if (!defaultVal) return 0;
           return this.sizeOf(defaultVal, {
             value: undefined,
@@ -184,6 +188,22 @@ export class Expr {
               return Infinity;
           }
         }
+        break;
+      }
+      case "HebrewString": {
+        if (typeof value == "string") {
+          const encoded = new HebrewEncoder().encode(value);
+          return encoded.length;
+        } else {
+          switch (mode) {
+            case "default":
+            case "min":
+              return 0;
+            case "max":
+              return Infinity;
+          }
+        }
+        break;
       }
       default:
         return this.sizeOfPrimitive(type.kind);
@@ -263,7 +283,7 @@ export class Expr {
         const enumMap = this.getEnum(type.name);
         if (!enumMap) throw new Error(`Enum '${type.name}' not found`);
         const num = enumMap.get(value as string);
-        if (num === undefined) throw new Error(`Enum variant '${value}' not found`);
+        if (num === undefined) throw new Error(`Enum variant '${JSON.stringify(value)}' not found`);
         putInt(num, this.sizeOfPrimitive(type.base));
         break;
       }
@@ -280,12 +300,13 @@ export class Expr {
         break;
       }
       case "Struct": {
+        if (!isValueMap(value)) { break; }
         const struct = this.get(type.name);
         if (!struct) throw new Error(`Unknown struct '${type.name}'`);
         if (typeof struct != 'object') throw new Error('Struct must be object');
         for (const [fname, ftype] of struct.fields) {
-          const fval = value[fname] ?? this.defaultValue(ftype, value as ValueMap);
-          this.writeValueHelper(fval, ftype, out, value as ValueMap);
+          const fval = value[fname] ?? this.defaultValue(ftype, value);
+          this.writeValueHelper(fval, ftype, out, value);
         }
         break;
       }
@@ -337,6 +358,19 @@ export class Expr {
         out.push(0);
         break;
       }
+      case "HebrewString": {
+        if (typeof value !== "string") {
+          throw new Error(`Expected string for CString, got ${typeof value}`);
+        }
+
+        const encoded = new HebrewEncoder().encode(value);
+        for (const byte of encoded) {
+          out.push(byte);
+        }
+
+        out.push(0);
+        break;
+      }
     }
   }
 
@@ -378,7 +412,7 @@ export class Expr {
         const struct = this.get(type.name);
         if (!struct) throw new Error(`Struct '${type.name}' not found`);
 
-        const fields = {};
+        const fields: ValueMap = {};
 
         for (const [fieldName, fieldType] of struct.fields) {
           const fieldVal =
@@ -416,8 +450,10 @@ export class Expr {
         );
       }
       case "CString": {
-        return ""
+        return "";
       }
+      case "HebrewString":
+        return "";
     }
   }
 
@@ -549,6 +585,24 @@ export class Expr {
 
         const strBytes = new Uint8Array(buf.slice(0, end));
         const str = new TextDecoder().decode(strBytes);
+        console.log(end + 1);
+        return [str, end + 1];
+      }
+      case "HebrewString": {
+        let end = -1;
+
+        for (let i = 0; i < buf.byteLength; i++) {
+          if (dv.getUint8(i) === 0) {
+            end = i;
+            break;
+          }
+        }
+
+        if (end === -1) return undefined;
+
+        const strBytes = new Uint8Array(buf.slice(0, end));
+        const str = new HebrewDecoder().decode(strBytes);
+        console.log(end + 1);
         return [str, end + 1];
       }
     }

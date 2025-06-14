@@ -1,9 +1,9 @@
-import React, { StrictMode, useState, useEffect } from 'react'
+import { StrictMode, useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./Layout";
 import HistoryPage from "./pages/HistoryPage";
 import SendPage from './pages/SendPage'
-import { Expr } from "./expr";
+import { Expr, FieldType } from "./expr";
 import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css'
 
@@ -19,7 +19,10 @@ function App() {
                 if (!response.ok) {
                     throw new Error(`Failed to load struct definition: ${response.statusText}`);
                 }
-                const input = await response.json();
+                const input = await response.json() as [
+                    | { type: "Struct"; name: string; fields: [string, FieldType][] }
+                    | { type: "Enum"; name: string; entries: [string, number][] }
+                ];
                 const parsedExpr = new Expr(input);
 
                 setExpr(parsedExpr);
@@ -30,7 +33,7 @@ function App() {
             }
         }
 
-        loadStructDefinition();
+        void loadStructDefinition();
     }, []);
 
 

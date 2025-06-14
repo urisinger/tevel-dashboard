@@ -1,10 +1,11 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useWebSocketContext } from './contexts/WebSocketContext';
+import { ReadyState } from 'react-use-websocket';
 
 const Layout: React.FC = () => {
     const { readyState } = useWebSocketContext();
-    const isSocketReady = readyState === 1;
+    const isSocketReady = readyState === ReadyState.OPEN;
 
     return (
         <div className="app-container">

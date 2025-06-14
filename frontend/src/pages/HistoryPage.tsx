@@ -16,7 +16,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ expr }) => {
     async function loadInitialHistory() {
       try {
         const res = await fetch("/api/history");
-        const json = await res.json();
+        const json = await res.json() as { data: string }[];
         const buffers: ArrayBuffer[] = json.map((entry: { data: string }) =>
           Uint8Array.from(atob(entry.data), c => c.charCodeAt(0)).buffer
         );
@@ -26,18 +26,21 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ expr }) => {
       }
     }
 
-    loadInitialHistory();
+    void loadInitialHistory();
   }, []);
 
   useEffect(() => {
     const ws = getWebSocket();
     if (!ws || readyState !== ReadyState.OPEN) return;
 
-    const handleMessage = async (event) => {
-      if (event.data instanceof Blob) {
-        const buffer = await event.data.arrayBuffer();
-        setMessages(prev => [buffer, ...prev]);
-      }
+    const handleMessage = function (this: WebSocket, event: Event): void {
+      const messageEvent = event as MessageEvent;
+      void (async () => {
+        if (messageEvent.data instanceof Blob) {
+          const buffer = await messageEvent.data.arrayBuffer();
+          setMessages(prev => [buffer, ...prev]);
+        }
+      })();
     };
 
     ws.addEventListener("message", handleMessage);

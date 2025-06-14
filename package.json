@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"npm run backend:run\"",
-    "build": "tsc -b && vite build && npm run backend:build",
+    "dev": "concurrently 'vite' 'npm run backend:run'",
+    "build": "npm run lint && tsc && vite build && npm run backend:build",
     "lint": "eslint .",
     "preview": "vite preview",
     "compile:structs": "cargo run --manifest-path=compiler/Cargo.toml -- frontend/public/structs.def",

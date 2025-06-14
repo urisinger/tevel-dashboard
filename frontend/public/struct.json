@@ -61,7 +61,7 @@
       [
         "s",
         {
-          "kind": "CString"
+          "kind": "HebrewString"
         }
       ],
       [
@@ -71,6 +71,14 @@
           "discriminant": "l",
           "enumTypeName": "T",
           "cases": {
+            "H": {
+              "kind": "Struct",
+              "name": "Person"
+            },
+            "Lol": {
+              "kind": "Struct",
+              "name": "Person"
+            },
             "V": {
               "kind": "Match",
               "discriminant": "l2",
@@ -86,14 +94,6 @@
                   "kind": "i8"
                 }
               }
-            },
-            "H": {
-              "kind": "Struct",
-              "name": "Person"
-            },
-            "Lol": {
-              "kind": "Struct",
-              "name": "Person"
             }
           }
         }

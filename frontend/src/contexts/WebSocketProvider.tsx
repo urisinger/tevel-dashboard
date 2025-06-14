@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import useWebSocket from 'react-use-websocket';
 import { WebSocketContext, } from './WebSocketContext';
 

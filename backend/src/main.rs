@@ -141,7 +141,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
-        .route("/history", get(history_handler))
+        .route("/api/history", get(history_handler))
         .with_state(state);
 
     let listener = TcpListener::bind(opt.ws_addr).await.unwrap();

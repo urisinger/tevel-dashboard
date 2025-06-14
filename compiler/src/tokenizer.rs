@@ -12,6 +12,7 @@ pub enum Token<'a> {
     F32,
     F64,
     CString,
+    HebrewString,
 
     // Symbols
     LBrace,
@@ -81,6 +82,7 @@ impl<'a> Lexer<'a> {
                     "enum" => Token::Enum,
                     "struct" => Token::Struct,
                     "CString" => Token::CString,
+                    "HebrewString" => Token::HebrewString,
                     "i8" => Token::I8,
                     "i16" => Token::I16,
                     "i32" => Token::I32,

@@ -94,11 +94,14 @@ const StructViewer: React.FC<{
             }
 
             default: {
+                if (typeof value === "object") {
+                    return undefined;
+                }
                 const display = value?.toString() ?? "—";
                 let typeLabel = type.kind as string;
                 if (type.kind === "Enum") typeLabel = `${type.name} (${type.base})`;
 
-                const classMap: Record<string, string> = {
+                const classMap: Record<typeof type.kind, string> = {
                     i8: "integer-value",
                     i16: "integer-value",
                     i32: "integer-value",
@@ -106,7 +109,8 @@ const StructViewer: React.FC<{
                     f32: "float-value",
                     f64: "float-value",
                     Enum: "enum-value",
-                    CString: "string-value"
+                    CString: "string-value",
+                    HebrewString: "string-value"
                 };
 
                 const className = classMap[type.kind] || "unknown-value";
