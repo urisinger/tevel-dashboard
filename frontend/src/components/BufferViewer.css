@@ -1,6 +1,7 @@
-/* EnhancedBufferViewer.css */
+@import "./shared.css";
 
 .enhanced-buffer-viewer {
+  max-width: none;
   margin-top: 30px;
   background-color: white;
   border-radius: 8px;
@@ -102,8 +103,6 @@
 .viewer-content {
   padding: 20px;
   min-height: 200px;
-  max-height: 600px;
-  overflow: auto;
 }
 
 .no-data {
@@ -113,85 +112,6 @@
   height: 200px;
   color: #95a5a6;
   font-style: italic;
-}
-
-/* Structured View Styles */
-.structured-view {
-  padding: 10px;
-}
-
-.struct-value {
-  border: 1px solid #e1e1e1;
-  border-radius: 6px;
-  padding: 15px;
-  margin-bottom: 5px;
-  background-color: #f9f9f9;
-}
-
-.root-struct {
-  border: none;
-  padding: 0;
-  background-color: transparent;
-}
-
-.struct-field-row {
-  display: flex;
-  padding: 8px 0;
-  border-bottom: 1px solid #eee;
-}
-
-.struct-field-row:last-child {
-  border-bottom: none;
-}
-
-.field-name {
-  flex: 1;
-  font-weight: 500;
-  color: #34495e;
-  padding-right: 15px;
-}
-
-.field-value {
-  flex: 2;
-}
-
-.primitive-value {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: 4px;
-  padding: 8px 12px;
-  background-color: white;
-  border: 1px solid #e1e1e1;
-}
-
-.value-content {
-  font-family: monospace;
-  font-size: 1.1rem;
-}
-
-.value-type {
-  color: #7f8c8d;
-  font-size: 0.8rem;
-  padding: 2px 6px;
-  background-color: #f1f1f1;
-  border-radius: 4px;
-}
-
-.integer-value {
-  border-left: 4px solid #2ecc71;
-}
-
-.bigint-value {
-  border-left: 4px solid #9b59b6;
-}
-
-.float-value {
-  border-left: 4px solid #3498db;
-}
-
-.unknown-value {
-  border-left: 4px solid #e74c3c;
 }
 
 /* Hex View Styles */

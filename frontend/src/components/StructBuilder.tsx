@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Expr, Value, FieldType, Struct } from "../expr";
+import React, { useEffect, useMemo, useState } from "react";
+import { Expr, Value, FieldType, Struct, ValueMap, ArrayLength } from "../expr";
 
 import './StructBuilder.css';
 
@@ -19,8 +19,8 @@ const I8Input = ({ name, onChange }: { name: string; onChange: (v: Value) => voi
       min={-128}
       max={127}
       defaultValue={0}
-      className="field-input"
-      onChange={(e) => onChange({ kind: "i8", value: parseInt(e.target.value) || 0 })}
+      className="field-input integer-value"
+      onChange={(e) => onChange(parseInt(e.target.value) || 0)}
     />
   );
 
@@ -32,8 +32,8 @@ const I16Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
       min={-32768}
       max={32767}
       defaultValue={0}
-      className="field-input"
-      onChange={(e) => onChange({ kind: "i16", value: parseInt(e.target.value) || 0 })}
+      className="field-input integer-value"
+      onChange={(e) => onChange(parseInt(e.target.value) || 0)}
     />
   );
 
@@ -41,9 +41,9 @@ const I32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
   wrapInput(name, "I32",
     <input
       type="number"
-      className="field-input"
+      className="field-input integer-value"
       defaultValue={0}
-      onChange={(e) => onChange({ kind: "i32", value: parseInt(e.target.value) || 0 })}
+      onChange={(e) => onChange(parseInt(e.target.value) || 0)}
     />
   );
 
@@ -52,12 +52,12 @@ const I64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
     <input
       type="number"
       defaultValue={0}
-      className="field-input"
+      className="field-input bigint-value"
       onChange={(e) => {
         try {
-          onChange({ kind: "i64", value: BigInt(e.target.value || 0) });
+          onChange(BigInt(e.target.value || 0));
         } catch {
-          onChange({ kind: "i64", value: BigInt(0) });
+          onChange(BigInt(0));
         }
       }}
     />
@@ -69,8 +69,8 @@ const F32Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
       type="number"
       step="any"
       defaultValue={0}
-      className="field-input"
-      onChange={(e) => onChange({ kind: "f32", value: parseFloat(e.target.value) || 0 })}
+      className="field-input float-value"
+      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
     />
   );
 
@@ -80,33 +80,34 @@ const F64Input = ({ name, onChange }: { name: string; onChange: (v: Value) => vo
       type="number"
       step="any"
       defaultValue={0}
-      className="field-input"
-      onChange={(e) => onChange({ kind: "f64", value: parseFloat(e.target.value) || 0 })}
+      className="field-input float-value"
+      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
     />
   );
 
 const StructInput = ({
   name,
-  structName,
   struct,
   expr,
   onChange,
 }: {
   name: string;
-  structName: string;
   struct: Struct;
   expr: Expr;
   onChange: (v: Value) => void;
 }) => {
-  const [fields, setFields] = useState<Map<string, Value>>(new Map());
+  const [fields, setFields] = useState<ValueMap>({});
 
-  const purgeDependentMatches = (
+  const purgeDependents = (
     discriminantName: string,
-    map: Map<string, Value>
+    map: ValueMap
   ) => {
     for (const [fname, ftype] of struct.fields) {
+      if (ftype.kind === "Array" && ftype.length.kind === "Dynamic" && ftype.length.field === discriminantName) {
+        delete map[fname];
+      }
       if (ftype.kind === "Match" && ftype.discriminant === discriminantName) {
-        map.delete(fname);
+        delete map[fname];
       }
     }
   };
@@ -126,16 +127,17 @@ const StructInput = ({
             expr={expr}
             parentFields={fields}
             onChange={(v) => {
-              const updated = new Map(fields);
-              updated.set(fieldName, v);
+              const updated = { ...fields };
+              updated[fieldName] = v;
 
-              /** if this field is an Enum → clean its Match dependents */
-              if (fieldType.kind === "Enum") {
-                purgeDependentMatches(fieldName, updated);
-              }
+              console.log(updated);
+              purgeDependents(fieldName, updated);
+
+
+              console.log(updated);
 
               setFields(updated);
-              onChange({ kind: "Struct", name: structName, fields: updated });
+              onChange(updated);
             }}
           />
         ))}
@@ -145,46 +147,118 @@ const StructInput = ({
 };
 
 
+
+const ArrayInput = ({
+  name,
+  type,
+  length,
+  expr,
+  parentFields,
+  onChange,
+}: {
+  name: string;
+  type: FieldType;
+  length: ArrayLength;
+  expr: Expr;
+  parentFields: ValueMap;
+  onChange: (v: Value) => void;
+}) => {
+
+  const computedLength = useMemo(() => {
+    if (length.kind === "Static") return length.value;
+    const fieldValue = parentFields[length.field];
+    if (typeof fieldValue === "number") return fieldValue;
+    if (typeof fieldValue === "bigint") return Number(fieldValue);
+    return 0;
+  }, [length, parentFields]);
+
+  const [items, setItems] = useState<Value[]>(() =>
+    Array.from({ length: computedLength }, () =>
+      expr.defaultValue(type, parentFields)
+    )
+  );
+
+  useEffect(() => {
+    setItems((prev) =>
+      Array.from({ length: computedLength }, (_, i) =>
+        prev[i] ?? expr.defaultValue(type, parentFields)
+      )
+    );
+  }, [computedLength, expr, type, parentFields]);
+
+
+  return (
+    <div className="struct-container">
+      <div className="struct-header">
+        <span className="struct-name">{name}</span>
+      </div>
+
+      <div className="struct-fields">
+        {items.map((value, i) => (
+          <ValueInput
+            key={i}
+            name={`${name}[${i}]`}
+            type={type}
+            expr={expr}
+            parentFields={parentFields}
+            onChange={(v) => {
+              const updated = [...items];
+              console.log(updated);
+              updated[i] = v;
+              setItems(updated);
+              onChange(updated);
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const EnumInput = ({
   name,
   enumName,
-  base,
   expr,
-  onChange
+  onChange,
 }: {
   name: string;
   enumName: string;
   expr: Expr;
-  base: "i8" | "i16" | "i32" | "i64";
   onChange: (v: Value) => void;
 }) => {
   const enumDef = expr.getEnum(enumName);
+
+  const entries = useMemo(() => {
+    return enumDef ? Array.from(enumDef) : [];
+  }, [enumDef]);
+
+  const [selected, setSelected] = useState(entries[0]?.[0] ?? "");
+
+  useEffect(() => {
+    if (entries.length > 0) {
+      setSelected(entries[0][0]);
+    }
+  }, [entries]);
 
   if (!enumDef) {
     return <div className="error-message">Enum '{enumName}' not found</div>;
   }
 
-  const entries = Array.from(enumDef); // [ ["Ok", 0], ["Fail", 1], ... ]
-
-
-
-  const [selected, setSelected] = useState(entries[0][0]);
-
-  return wrapInput(name, enumName,
+  return wrapInput(
+    name,
+    enumName,
     <select
-      className="field-input"
+      className="field-input enum-value"
       value={selected}
       onChange={(e) => {
         const value = e.target.value;
         setSelected(value);
         if (value !== "") {
-          onChange({ kind: "Enum", name: enumName, base, value });
-
+          onChange(value);
         }
       }}
     >
-      <option value="" disabled hidden>
-      </option>
+      <option value="" disabled hidden />
       {entries.map(([label]) => (
         <option key={label} value={label}>
           {label}
@@ -194,22 +268,24 @@ const EnumInput = ({
   );
 };
 
+
 const MatchInput: React.FC<{
   name: string;
   type: Extract<FieldType, { kind: "Match" }>;
   expr: Expr;
-  parentFields: Map<string, Value> | null;
+  parentFields: ValueMap;
   onChange: (v: Value) => void;
 }> = ({ name, type, expr, parentFields, onChange }) => {
-  const discriminantValue = parentFields?.get(type.discriminant);
+
+  const discriminantValue = parentFields[type.discriminant];
+
   const enumKey =
-    discriminantValue?.kind === "Enum"
-      ? discriminantValue.value
-      : Array.from(type.cases.keys())[0];
-  const selectedCase = type.cases.get(enumKey)!;
+    typeof discriminantValue === "string"
+      ? discriminantValue
+      : expr.getEnum(type.enumTypeName)?.keys().next().value;
 
 
-
+  const selectedCase = type.cases[enumKey]!;
 
 
   return (
@@ -226,12 +302,13 @@ const MatchInput: React.FC<{
 };
 
 
+
 const ValueInput: React.FC<{
   name: string;
   type: FieldType;
   expr: Expr;
   onChange: (value: Value) => void;
-  parentFields: Map<string, Value> | null;
+  parentFields: ValueMap;
 }> = ({ name, type, expr, onChange, parentFields }) => {
   switch (type.kind) {
     case "i8":
@@ -253,7 +330,6 @@ const ValueInput: React.FC<{
       return (
         <StructInput
           name={name}
-          structName={type.name}
           struct={struct}
           expr={expr}
           onChange={onChange}
@@ -266,7 +342,6 @@ const ValueInput: React.FC<{
           name={name}
           enumName={type.name}
           expr={expr}
-          base={type.base}
           onChange={onChange}
         />
       );
@@ -280,6 +355,16 @@ const ValueInput: React.FC<{
           onChange={onChange}
         />
       );
+    case "Array":
+      return (<ArrayInput
+        name={name}
+        type={type.elementType}
+        length={type.length}
+        expr={expr}
+        parentFields={parentFields}
+        onChange={onChange}
+      />);
+
   }
 };
 
@@ -292,42 +377,22 @@ interface ValueFormProps {
 }
 
 const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, onSubmit }) => {
-  const [fields, setFields] = useState<Map<string, Value>>(new Map());
+  const [fields, setFields] = useState<ValueMap>({});
   const struct = expr.get(structName);
 
   if (!struct) {
     return <div className="loading-message">Loading form...</div>;
   }
 
-  const purgeDependentMatches = (discriminantName: string, map: Map<string, Value>) => {
-    for (const [fieldName, fieldType] of struct.fields) {
-      if (fieldType.kind === "Match" && fieldType.discriminant === discriminantName) {
-        map.delete(fieldName); // 🧹 remove stale field
-      }
-    }
-  };
-
-  const handleFieldChange = (fieldName: string, fieldValue: Value) => {
-    const updated = new Map(fields);
-    updated.set(fieldName, fieldValue);
-
-    const fieldType = struct.fields.find(([name]) => name === fieldName)?.[1];
-    if (fieldType?.kind === "Enum") {
-      purgeDependentMatches(fieldName, updated);
-    }
-
-    setFields(updated);
-  };
-
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    onSubmit({ kind: "Struct", fields, name: structName });
+    onSubmit(fields);
   };
 
-  const currentSize = expr.sizeOf({ kind: "Struct", name: structName }, {
-    value: { kind: "Struct" as const, name: structName, fields },
-    mode: "default"
-  });
+  const currentSize = expr.sizeOf(
+    { kind: "Struct", name: structName },
+    { value: fields, mode: "default" }
+  );
 
   return (
     <div className="form-container">
@@ -337,29 +402,18 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="struct-container">
-          <div className="struct-header">
-            <span className="struct-name">{structName}</span>
-          </div>
-          <div className="struct-fields">
-            {struct.fields.map(([fieldName, fieldType]) => (
-              <ValueInput
-                key={fieldName}
-                name={fieldName}
-                type={fieldType}
-                expr={expr}
-                onChange={(v) => handleFieldChange(fieldName, v)}
-                parentFields={fields}
-              />
-            ))}
-          </div>
-        </div>
+        <StructInput
+          name={structName}
+          struct={struct}
+          expr={expr}
+          onChange={setFields}
+        />
 
         <div className="form-actions">
           <button
             type="submit"
             disabled={!isSocketReady}
-            className={`submit-button`}
+            className="submit-button"
           >
             {!isSocketReady ? "WebSocket Disconnected" : "Send to WebSocket"}
           </button>
@@ -368,6 +422,7 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     </div>
   );
 };
+
 
 
 export default ValueForm;

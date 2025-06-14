@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Expr } from "../expr";
 import BufferViewer from "../components/BufferViewer";
-import { WebSocketContext } from "../contexts/WebSocketContext";
+import { useWebSocketContext } from "../contexts/WebSocketContext";
 import { ReadyState } from "react-use-websocket";
 
 interface HistoryPageProps {
@@ -9,7 +9,7 @@ interface HistoryPageProps {
 }
 
 const HistoryPage: React.FC<HistoryPageProps> = ({ expr }) => {
-  const { getWebSocket, readyState } = useContext(WebSocketContext);
+  const { getWebSocket, readyState } = useWebSocketContext();
   const [messages, setMessages] = useState<ArrayBuffer[]>([]);
 
   useEffect(() => {

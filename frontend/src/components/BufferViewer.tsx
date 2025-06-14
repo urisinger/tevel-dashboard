@@ -1,84 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Expr, Value } from "../expr";
+import { Expr, FieldType, Value, ValueMap } from "../expr";
 import './BufferViewer.css';
+import StructViewer from "./StructViewer";
 
 interface BufferViewerProps {
   bytes: ArrayBuffer;
   expr: Expr;
   valueType: string;
 }
-
-// Component to visualize a struct value
-const StructViewer: React.FC<{ value: Value; depth?: number }> = ({
-  value,
-  depth = 0
-}) => {
-  if (value.kind !== "Struct") {
-    return <div className="error-message">Not a struct value</div>;
-  }
-
-  return (
-    <div className={`struct-value ${depth === 0 ? 'root-struct' : ''}`}>
-      {Array.from(value.fields).map(([fieldName, fieldValue], index) => (
-        <div key={index} className="struct-field-row">
-          <div className="field-name">{fieldName}</div>
-          <div className="field-value">
-            {fieldValue.kind === "Struct" ? (
-              <StructViewer value={fieldValue} depth={depth + 1} />
-            ) : (
-              <PrimitiveViewer value={fieldValue} />
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// Component to visualize a primitive value
-const PrimitiveViewer: React.FC<{ value: Value }> = ({ value }) => {
-  if (value.kind === "Struct") {
-    return <div className="error-message">Expected primitive, got struct</div>;
-  }
-
-  let displayValue: string;
-  let typeClass: string;
-
-  switch (value.kind) {
-    case "i8":
-    case "i16":
-    case "i32":
-      displayValue = value.value.toString();
-      typeClass = "integer-value";
-      break;
-    case "i64":
-      displayValue = value.value.toString();
-      typeClass = "bigint-value";
-      break;
-    case "f32":
-    case "f64":
-      // Format floating point to 4 decimal places if needed
-      displayValue =
-        value.value % 1 === 0
-          ? value.value.toString()
-          : value.value.toFixed(4);
-      typeClass = "float-value";
-      break;
-    case "Enum":
-      displayValue = value.value;
-      typeClass = "enum-value";
-      break;
-  }
-
-  return (
-    <div className={`primitive-value ${typeClass}`}>
-      <span className="value-content">{displayValue}</span>
-      <span className="value-type">
-        {value.kind === "Enum" ? `${value.name} (${value.base})` : value.kind}
-      </span>
-    </div>
-  );
-};
 
 const HexViewer: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
   const bytesPerRow = 16;
@@ -150,14 +79,9 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
       setError(null);
       setParsedValue(null);
 
-      console.log("h");
-
       // Use the Expr to parse the buffer
       const value = expr.readValue(bytes, valueType);
       setParsedValue(value);
-
-
-      console.log("hh");
 
 
       if (!value) {
@@ -219,7 +143,12 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
       <div className="viewer-content">
         {activeTab === 'structured' && parsedValue && (
           <div className="structured-view">
-            <StructViewer value={parsedValue} />
+            <StructViewer
+              value={parsedValue as ValueMap}
+              type={{ kind: "Struct", name: valueType }}
+              expr={expr}
+              name={null}
+            />
           </div>
         )}
 

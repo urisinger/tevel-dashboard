@@ -2,7 +2,6 @@ import React from 'react';
 import { Expr } from '../expr';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
 import StructBuilder from '../components/StructBuilder';
-import './SendPage.css';
 
 interface SendPageProps {
   expr: Expr;
@@ -13,7 +12,7 @@ const SendPage: React.FC<SendPageProps> = ({ expr }) => {
 
   const handleSubmit = (value: any) => {
     try {
-      const bytes = expr.encodeValue(value);
+      const bytes = expr.encodeValue(value, "Main");
       sendMessage(bytes);
     } catch (e: any) {
       console.error('Failed to encode value:', e);
@@ -25,10 +24,11 @@ const SendPage: React.FC<SendPageProps> = ({ expr }) => {
       <StructBuilder
         structName="Main"
         expr={expr}
-        isSocketReady={readyState === 1}
+        isSocketReady={readyState === 1
+        }
         onSubmit={handleSubmit}
       />
-    </div>
+    </div >
   );
 };
 

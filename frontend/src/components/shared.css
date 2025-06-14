@@ -1,0 +1,72 @@
+@import "../styles/theme.css";
+
+.error-message {
+    color: var(--color-danger);
+    padding: var(--spacing-sm);
+    border-left: 3px solid var(--color-danger);
+    background-color: var(--color-danger-light);
+    margin-bottom: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    grid-column: 1 / -1;
+}
+
+.struct-size {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--text-sm);
+}
+
+.struct-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    background-color: var(--bg-white);
+}
+
+.struct-header {
+    font-weight: 600;
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+}
+
+.struct-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+}
+
+
+.field-container {
+    box-sizing: border-box;
+    min-width: 200px;
+    flex-direction: column;
+}
+
+.field-label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.integer-value {
+    border-left: 4px solid #2ecc71;
+}
+
+.bigint-value {
+    border-left: 4px solid #9b59b6;
+}
+
+.float-value {
+    border-left: 4px solid #3498db;
+}
+
+.enum-value {
+    border-left: 4px solid #f39c12;
+}
+
+.unknown-value {
+    border-left: 4px solid #FF6EC7;
+}

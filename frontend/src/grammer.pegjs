@@ -17,48 +17,56 @@ EnumDefinition
       return { type: "enum", name, entries };
     }
 
+
 FieldList
   = f:Field* { return f; }
 
 Field
   = _ name:Identifier _ ":" field:Type _ ","? {
-    return [name, field]
+    return [name, field];
   }
 
 Type 
-  = (BasicType / MatchType / EnumType / StructType ) 
+  = (BasicType / MatchType / EnumType / StructType / ArrayType)
 
 BasicType
   = _ kind:("i8" / "i16" / "i32" / "i64" / "f32" / "f64" ) {
-    return {kind}
+    return { kind };
   }
 
-StructType
-  =  _ base:Identifier _ {
-      return  { kind: "Struct", name: base };  
+ArrayType
+  = _ "[" _ elementType:Type _ ";" _ length:ArrayLength _ "]" {
+      return { kind: "Array", elementType, length };
     }
 
+ArrayLength
+  = len:Integer { return { kind: "Static", value: parseInt(len, 10) }; }
+  / ident:Identifier { return { kind: "Dynamic", field: ident }; }
+
+StructType
+  = _ base:Identifier _ {
+      return { kind: "Struct", name: base };
+    }
 
 EnumType
-  =  _ base:Identifier _ "(" _ param:Identifier _ ")"  _ {
+  = _ base:Identifier _ "(" _ param:Identifier _ ")" _ {
       return { kind: "Enum", name: base, base: param.toLowerCase() };
     }
 
-
-
 MatchType
-  =  _ "match" __ discrim:Identifier _ "{" _ cases:MatchCaseList _ "}" _ {
-      return { kind: "Match", discriminant: discrim, cases: new Map(cases) };
+  = _ "match" __ discrim:Identifier _ "{" _ cases:MatchCaseList _ "}" _ {
+      const obj = {};
+      for (const [tag, typ] of cases) obj[tag] = typ;
+      return { kind: "Match", discriminant: discrim, cases: obj };
     }
-
-
 
 MatchCaseList
   = c:MatchCase* { return c; }
 
 MatchCase
-  = _ tag:Identifier _ "=>" _ typ:Type _ ","? _ { return [tag, typ]; }
-
+  = _ tag:Identifier _ "=>" _ typ:Type _ ","? _ {
+      return [tag, typ];
+    }
 
 EnumEntryList
   = e:EnumEntry* { return e; }

@@ -1,0 +1,132 @@
+[
+  {
+    "type": "Struct",
+    "name": "Person",
+    "fields": [
+      [
+        "type",
+        {
+          "kind": "i32"
+        }
+      ],
+      [
+        "height",
+        {
+          "kind": "f64"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "Employee",
+    "fields": [
+      [
+        "id",
+        {
+          "kind": "i64"
+        }
+      ],
+      [
+        "l",
+        {
+          "kind": "Enum",
+          "name": "T",
+          "base": "i8"
+        }
+      ],
+      [
+        "l2",
+        {
+          "kind": "Enum",
+          "name": "T",
+          "base": "i8"
+        }
+      ],
+      [
+        "arr",
+        {
+          "kind": "Array",
+          "elementType": {
+            "kind": "Enum",
+            "name": "T",
+            "base": "i8"
+          },
+          "length": {
+            "kind": "Dynamic",
+            "field": "id"
+          }
+        }
+      ],
+      [
+        "person",
+        {
+          "kind": "Match",
+          "discriminant": "l",
+          "enumTypeName": "T",
+          "cases": {
+            "V": {
+              "kind": "Match",
+              "discriminant": "l2",
+              "enumTypeName": "T",
+              "cases": {
+                "Lol": {
+                  "kind": "i8"
+                },
+                "V": {
+                  "kind": "i32"
+                }
+              }
+            },
+            "Lol": {
+              "kind": "Struct",
+              "name": "Person"
+            }
+          }
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "Main",
+    "fields": [
+      [
+        "employee",
+        {
+          "kind": "Struct",
+          "name": "Employee"
+        }
+      ],
+      [
+        "person",
+        {
+          "kind": "Struct",
+          "name": "Person"
+        }
+      ],
+      [
+        "status",
+        {
+          "kind": "Enum",
+          "name": "T",
+          "base": "i8"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Enum",
+    "name": "T",
+    "entries": [
+      [
+        "Lol",
+        1
+      ],
+      [
+        "V",
+        2
+      ]
+    ]
+  }
+]

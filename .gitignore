@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 backend/target
+compiler/target
 echo
 echo.exe
 

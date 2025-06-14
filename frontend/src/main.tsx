@@ -16,12 +16,13 @@ function Main() {
   useEffect(() => {
     async function loadStructDefinition() {
       try {
-        const response = await fetch('/struct.def');
+        const response = await fetch('/struct.json');
         if (!response.ok) {
           throw new Error(`Failed to load struct definition: ${response.statusText}`);
         }
-        const input = await response.text();
-        const parsedExpr = Expr.parse(input);
+        const input = await response.json();
+        const parsedExpr = new Expr(input);
+
         setExpr(parsedExpr);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load struct definition');
@@ -32,6 +33,7 @@ function Main() {
 
     loadStructDefinition();
   }, []);
+
 
   if (loading) {
     return <div className="loading">Loading struct definition...</div>;
