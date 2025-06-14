@@ -8,8 +8,8 @@ import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css'
 
 function App() {
-    const [expr, setExpr] = useState<Expr | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [expr, setExpr] = useState<Expr | undefined>();
+    const [error, setError] = useState<string | undefined>();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

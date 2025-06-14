@@ -69,15 +69,15 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
   expr,
   valueType
 }) => {
-  const [parsedValue, setParsedValue] = useState<Value | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [parsedValue, setParsedValue] = useState<Value | undefined>();
+  const [error, setError] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<'structured' | 'hex' | 'json'>('structured');
 
   useEffect(() => {
     try {
       // Reset states
-      setError(null);
-      setParsedValue(null);
+      setError(undefined);
+      setParsedValue(undefined);
 
       // Use the Expr to parse the buffer
       const value = expr.readValue(bytes, valueType);
@@ -147,7 +147,6 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
               value={parsedValue as ValueMap}
               type={{ kind: "Struct", name: valueType }}
               expr={expr}
-              name={null}
             />
           </div>
         )}

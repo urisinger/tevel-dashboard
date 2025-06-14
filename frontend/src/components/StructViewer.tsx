@@ -4,17 +4,17 @@ import './StructViewer.css';
 
 
 const StructViewer: React.FC<{
-    name: string | null;
+    name?: string;
     value: Value;
     type: FieldType;
     expr: Expr;
-    parentFields?: ValueMap | null;
+    parentFields?: ValueMap;
 }> = ({
-    name = null,
+    name,
     value,
     type,
     expr,
-    parentFields = null,
+    parentFields,
 }) => {
         const label = name && <label className="field-label">{name}</label>;
 

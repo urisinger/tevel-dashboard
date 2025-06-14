@@ -60,7 +60,7 @@ export class Expr {
     type: FieldType,
     options: {
       value?: Value;
-      parentFields?: ValueMap | null;
+      parentFields?: ValueMap;
       mode: "min" | "max" | "default";
     }
   ): number {
@@ -180,15 +180,15 @@ export class Expr {
     }
   }
 
-  minSizeOf(type: FieldType, value?: Value, parentFields: ValueMap | null = null): number {
+  minSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap): number {
     return this.sizeOf(type, { value, parentFields, mode: "min" });
   }
 
-  maxSizeOf(type: FieldType, value?: Value, parentFields: ValueMap | null = null): number {
+  maxSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap): number {
     return this.sizeOf(type, { value, parentFields, mode: "max" });
   }
 
-  defaultSizeOf(type: FieldType, value?: Value, parentFields: ValueMap | null = null): number {
+  defaultSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap): number {
     return this.sizeOf(type, { value, parentFields, mode: "default" });
   }
 
@@ -199,7 +199,7 @@ export class Expr {
     return new Uint8Array(bytes);
   }
 
-  writeValueHelper(value: Value, type: FieldType, out: number[], parentFields: ValueMap | null = null): void {
+  writeValueHelper(value: Value, type: FieldType, out: number[], parentFields?: ValueMap): void {
     const putInt = (val: number | bigint, size: 1 | 2 | 4 | 8) => {
       switch (size) {
         case 1:
@@ -307,14 +307,14 @@ export class Expr {
   }
 
 
-  readValue(buf: ArrayBuffer, layoutName: string): Value | null {
+  readValue(buf: ArrayBuffer, layoutName: string): Value | undefined {
     const result = this.readByType(buf, { kind: "Struct", name: layoutName });
-    return result ? result[0] : null;
+    return result ? result[0] : undefined;
   }
 
   defaultValue(
     type: FieldType,
-    parentFields: ValueMap | null = null
+    parentFields?: ValueMap
   ): Value {
     switch (type.kind) {
       case "i8": return 0;
@@ -377,7 +377,7 @@ export class Expr {
   }
 
 
-  private readByType(buf: ArrayBuffer, type: FieldType, parentFields: ValueMap | null = null): [Value, number] | null {
+  private readByType(buf: ArrayBuffer, type: FieldType, parentFields?: ValueMap): [Value, number] | undefined {
     const dv = new DataView(buf);
 
     const readInt = (size: number): number | bigint => {
@@ -421,7 +421,7 @@ export class Expr {
 
       case "Struct": {
         const struct = this.get(type.name);
-        if (!struct) return null;
+        if (!struct) return undefined;
 
         let offset = 0;
         const fields = {};
@@ -429,7 +429,7 @@ export class Expr {
         for (const [fieldName, type] of struct.fields) {
           let value: Value;
           const result = this.readByType(buf.slice(offset), type, fields);
-          if (!result) return null;
+          if (!result) return undefined;
           result[1] += offset;
           [value, offset] = result;
           fields[fieldName] = value;
@@ -439,7 +439,7 @@ export class Expr {
       }
       case "Match": {
         if (!parentFields) {
-          return null;
+          return undefined;
         }
         const discrimVal = parentFields[type.discriminant];
         if (!discrimVal || typeof discrimVal !== "string") {
@@ -475,7 +475,7 @@ export class Expr {
 
         for (let i = 0; i < length; i++) {
           const result = this.readByType(buf.slice(offset), elementType, parentFields);
-          if (!result) return null;
+          if (!result) return undefined;
 
           const [value, size] = result;
           values.push(value);

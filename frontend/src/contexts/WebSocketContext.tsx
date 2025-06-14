@@ -8,7 +8,7 @@ export interface WebSocketContextType {
     readyState: ReadyState;
 }
 
-export const WebSocketContext = createContext<WebSocketContextType | null>(null);
+export const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export function useWebSocketContext(): WebSocketContextType {
     const context = useContext(WebSocketContext);
