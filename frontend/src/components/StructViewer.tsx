@@ -1,11 +1,12 @@
 import { Expr, FieldType, Value, ValueMap } from "../expr";
 import React from "react";
 import './StructViewer.css';
+import './shared.css';
 
 
 const StructViewer: React.FC<{
     name?: string;
-    value: Value;
+    value: Value | undefined;
     type: FieldType;
     expr: Expr;
     parentFields?: ValueMap;
@@ -25,6 +26,9 @@ const StructViewer: React.FC<{
                     return <div className="error-message">Unknown struct: {type.name}</div>;
                 }
 
+                if (!value) {
+                    return undefined;
+                }
                 const fieldMap = value as ValueMap;
 
                 return (

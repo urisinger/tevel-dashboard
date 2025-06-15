@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::tokenizer::Token;
+use crate::lexer::Token;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -70,9 +70,8 @@ pub enum IntegerBase {
     I64,
 }
 
-pub fn parser<'a>(
-) -> impl Parser<'a, &'a [Token<'a>], Vec<Definition>, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>>
-{
+pub fn parser<'a>()
+-> impl Parser<'a, &'a [Token<'a>], Vec<Definition>, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
     let ident = select! { Token::Identifier(name) => name.to_string() };
     let int_lit = select! { Token::Integer(num) => num.parse::<usize>().unwrap() };
 
@@ -109,8 +108,8 @@ pub fn parser<'a>(
     struct_def.or(enum_def).repeated().collect()
 }
 
-fn field_type_parser<'a>(
-) -> impl Parser<'a, &'a [Token<'a>], FieldType, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
+fn field_type_parser<'a>()
+-> impl Parser<'a, &'a [Token<'a>], FieldType, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
     recursive(|field_type| {
         let ident = select! {
             Token::Identifier(name) => name.to_string(),

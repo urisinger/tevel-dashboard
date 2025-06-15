@@ -2,15 +2,26 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { useWebSocketContext } from './contexts/WebSocketContext';
 import { ReadyState } from 'react-use-websocket';
+import { useTheme } from './contexts/ThemeContext';
 
 const Layout: React.FC = () => {
     const { readyState } = useWebSocketContext();
     const isSocketReady = readyState === ReadyState.OPEN;
 
+    const { theme, toggleTheme } = useTheme();
+
     return (
         <div className="app-container">
             <div className="sidebar">
                 <div className="sidebar-header">
+                    <button
+                        className="theme-toggle"
+                        onClick={toggleTheme}
+                        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'
+                            } mode`}
+                    >
+                        {theme === 'light' ? '🌙' : '☀️'}
+                    </button>
                     <h2>Dashboard</h2>
                 </div>
                 <div className="sidebar-content">

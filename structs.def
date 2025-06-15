@@ -1,0 +1,61 @@
+enum ShapeType {
+  Circle = 0,
+  Rectangle = 1,
+  Triangle = 2
+}
+
+enum Language {
+  English = 0,
+  Hebrew = 1
+}
+
+struct Point {
+  x: f32,
+  y: f32
+}
+
+struct CircleData {
+  radius: f32
+}
+
+struct RectangleData {
+  width: f32,
+  height: f32
+}
+
+struct TriangleData {
+  a: Point,
+  b: Point,
+  c: Point
+}
+
+struct DrawingMetadata {
+  language: Language(i8),
+  title: match language: Language{
+    English => CString,
+    Hebrew => HebrewString,
+  },
+  tagsCount: i8,
+  tags: [match language: language{
+    English => CString,
+    Hebrew => HebrewString,}
+  ; tagsCount] // dynamic array
+}
+
+struct Shape {
+  kind: ShapeType(i8),
+  data: match kind: ShapeType {
+    Circle => CircleData,
+    Rectangle => RectangleData,
+    Triangle => TriangleData
+  },
+  position: Point
+}
+
+struct Main {
+  metadata: DrawingMetadata,
+  shapeCount: i16,
+  shapes: [Shape; shapeCount], // dynamic array
+  scaleFactors: [f64; 3],      // static array
+  caption: HebrewString        // Hebrew-encoded string
+}

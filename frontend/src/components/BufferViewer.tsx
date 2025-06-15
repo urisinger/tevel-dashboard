@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Expr, Value, ValueMap } from "../expr";
-import './BufferViewer.css';
 import StructViewer from "./StructViewer";
+
+import './BufferViewer.css';
+import './shared.css';
 
 interface BufferViewerProps {
   bytes: ArrayBuffer;

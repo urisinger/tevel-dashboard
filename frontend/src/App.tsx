@@ -6,6 +6,7 @@ import SendPage from './pages/SendPage'
 import { Expr, FieldType } from "./expr";
 import { WebSocketProvider } from './contexts/WebSocketProvider';
 import './index.css'
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function App() {
     const [expr, setExpr] = useState<Expr | undefined>();
@@ -15,7 +16,7 @@ function App() {
     useEffect(() => {
         async function loadStructDefinition() {
             try {
-                const response = await fetch('/struct.json');
+                const response = await fetch('/api/structs.json');
                 if (!response.ok) {
                     throw new Error(`Failed to load struct definition: ${response.statusText}`);
                 }
@@ -51,16 +52,18 @@ function App() {
 
     return (
         <StrictMode>
-            <WebSocketProvider>
-                <Router>
-                    <Routes>
-                        <Route path="/" element={<Layout />}>
-                            <Route index element={<SendPage expr={expr} />} />
-                            <Route path="history" element={<HistoryPage expr={expr} />} />
-                        </Route>
-                    </Routes>
-                </Router>
-            </WebSocketProvider>
+            <ThemeProvider>
+                <WebSocketProvider>
+                    <Router>
+                        <Routes>
+                            <Route path="/" element={<Layout />}>
+                                <Route index element={<SendPage expr={expr} />} />
+                                <Route path="history" element={<HistoryPage expr={expr} />} />
+                            </Route>
+                        </Routes>
+                    </Router>
+                </WebSocketProvider>
+            </ThemeProvider>
         </StrictMode>
     );
 };

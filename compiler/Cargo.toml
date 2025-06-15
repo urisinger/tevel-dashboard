@@ -1,5 +1,5 @@
 [package]
-name = "struct_expr_compiler"
+name = "type_expr_compiler"
 version = "0.1.0"
 edition = "2024"
 description = "A typed struct/match/enum parser and compiler to JSON"

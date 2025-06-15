@@ -189,15 +189,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "struct_expr_compiler"
-version = "0.1.0"
-dependencies = [
- "chumsky",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "syn"
 version = "2.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -206,6 +197,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "type_expr_compiler"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

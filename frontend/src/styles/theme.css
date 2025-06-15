@@ -1,5 +1,5 @@
 :root {
-  /* Colors */
+  /* existing light theme variables */
   --color-primary: #2c3e50;
   --color-primary-light: #34495e;
   --color-secondary: #7f8c8d;
@@ -9,53 +9,79 @@
   --color-danger-light: #fadbd8;
   --color-warning: #f39c12;
   --color-info: #3498db;
-  
-  /* Background Colors */
+
   --bg-primary: #f5f5f5;
   --bg-secondary: #f8f9fa;
-  --bg-white: #ffffff;
+  --bg-surface: #ffffff;
   --bg-hover: rgba(255, 255, 255, 0.1);
   --bg-active: rgba(255, 255, 255, 0.2);
-  
-  /* Text Colors */
+
   --text-primary: var(--color-primary);
   --text-secondary: var(--color-secondary);
   --text-light: #ffffff;
-  
-  /* Border Colors */
+
+  --sidebar-bg: #2c3e50;
+  --sidebar-hover: #34495e;
+  --sidebar-active: #1f2d3d;
+
   --border-color: #e1e1e1;
   --border-color-light: #eee;
-  
-  /* Shadows */
+
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  
-  /* Spacing */
+
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
-  
-  /* Border Radius */
+
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  
-  /* Font Sizes */
+
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
-  
-  /* Layout */
+
   --sidebar-width: 250px;
   --header-height: 60px;
-  
-  /* Transitions */
+
   --transition-fast: 0.2s;
   --transition-normal: 0.3s;
-} 
+}
+
+/* 🌙 Dark Theme */
+:root[data-theme="dark"] {
+  --color-primary: #ecf0f1;
+  --color-primary-light: #bdc3c7;
+  --color-secondary: #95a5a6;
+  --color-success: #27ae60;
+  --color-success-dark: #1e8449;
+  --color-danger: #c0392b;
+  --color-danger-light: #e6b0aa;
+  --color-warning: #f39c12;
+  --color-info: #2980b9;
+
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #2c2c2c;
+  --bg-surface: #252525;
+  --bg-surface-alt: #323232;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.10);
+
+  --sidebar-bg: var(--bg-primary);
+  --sidebar-hover: var(--bg-surface);
+  --sidebar-active: var(--bg-hover);
+
+  --border-color: #3a3a3a;
+  --border-color-light: #555;
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6);
+}

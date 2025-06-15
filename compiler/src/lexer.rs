@@ -72,8 +72,31 @@ impl<'a> Lexer<'a> {
         self.consume_while(|c| c.is_whitespace());
     }
 
+    fn skip_comment(&mut self) {
+        if self.peek() == Some('/') {
+            let mut chars = self.input[self.pos..].chars();
+            chars.next();
+            if chars.next() == Some('/') {
+                self.bump();
+                self.bump();
+                self.consume_while(|c| c != '\n');
+            }
+        }
+    }
+
+    fn skip_trivia(&mut self) {
+        loop {
+            let before = self.pos;
+            self.skip_whitespace();
+            self.skip_comment();
+            if self.pos == before {
+                break;
+            }
+        }
+    }
+
     pub fn next_token(&mut self) -> Option<Token<'a>> {
-        self.skip_whitespace();
+        self.skip_trivia();
         match self.peek()? {
             c if c.is_ascii_alphabetic() || c == '_' => {
                 let ident = self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');

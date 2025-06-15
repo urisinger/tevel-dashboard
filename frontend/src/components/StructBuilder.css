@@ -1,5 +1,4 @@
 @import "../styles/theme.css";
-@import "./shared.css";
 
 .form-container {
   background-color: var(--bg-primary);
@@ -18,15 +17,17 @@
 
 .field-input {
   width: 100%;
+  box-sizing: border-box;
   font-family: monospace;
-  font-size: var(--text-lg);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-right: 1px solid var(--border-color);
-  border-top: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
   font-size: var(--text-base);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-secondary-light);
+  color: var(--text-primary);
   transition: border-color var(--transition-normal);
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .field-input:focus {
@@ -57,7 +58,7 @@
 }
 
 .submit-button:hover {
-  background-color: var(--color-success-dark);
+  background-color: var(--color-danger);
 }
 
 .submit-button.disabled {
