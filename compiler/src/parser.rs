@@ -30,7 +30,8 @@ pub enum FieldType {
     },
     Enum {
         name: String,
-        base: IntegerBase,
+        signed: bool,
+        width: u8,
     },
     Match {
         discriminant: String,
@@ -38,14 +39,10 @@ pub enum FieldType {
         enum_type_name: String,
         cases: HashMap<String, FieldType>,
     },
-    #[serde(rename = "i8")]
-    I8,
-    #[serde(rename = "i16")]
-    I16,
-    #[serde(rename = "i32")]
-    I32,
-    #[serde(rename = "i64")]
-    I64,
+    Int {
+        signed: bool,
+        width: u8,
+    },
     #[serde(rename = "f32")]
     F32,
     #[serde(rename = "f64")]
@@ -61,17 +58,9 @@ pub enum ArrayLength {
     Dynamic { field: String },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum IntegerBase {
-    I8,
-    I16,
-    I32,
-    I64,
-}
-
-pub fn parser<'a>()
--> impl Parser<'a, &'a [Token<'a>], Vec<Definition>, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
+pub fn parser<'a>(
+) -> impl Parser<'a, &'a [Token<'a>], Vec<Definition>, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>>
+{
     let ident = select! { Token::Identifier(name) => name.to_string() };
     let int_lit = select! { Token::Integer(num) => num.parse::<usize>().unwrap() };
 
@@ -108,8 +97,8 @@ pub fn parser<'a>()
     struct_def.or(enum_def).repeated().collect()
 }
 
-fn field_type_parser<'a>()
--> impl Parser<'a, &'a [Token<'a>], FieldType, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
+fn field_type_parser<'a>(
+) -> impl Parser<'a, &'a [Token<'a>], FieldType, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
     recursive(|field_type| {
         let ident = select! {
             Token::Identifier(name) => name.to_string(),
@@ -119,31 +108,29 @@ fn field_type_parser<'a>()
             Token::Integer(num_str) => num_str.parse::<usize>().unwrap()
         };
 
-        let int_base = select! {
-            Token::I8 => IntegerBase::I8,
-            Token::I16 => IntegerBase::I16,
-            Token::I32 => IntegerBase::I32,
-            Token::I64 => IntegerBase::I64,
+        let int_type = select! {
+            Token::IntWidth { signed, width } => (signed, width)
         };
 
         let basic_type = select! {
-            Token::I8 => FieldType::I8,
-            Token::I16 => FieldType::I16,
-            Token::I32 => FieldType::I32,
-            Token::I64 => FieldType::I64,
-            Token::F32 => FieldType::F32,
-            Token::F64 => FieldType::F64,
-            Token::CString => FieldType::CString,
-            Token::HebrewString => FieldType::HebrewString,
-        };
+            Token::IntWidth { signed, width } => FieldType::Int { signed, width },
+        Token::F32 => FieldType::F32,
+        Token::F64 => FieldType::F64,
+                Token::CString => FieldType::CString,
+                Token::HebrewString => FieldType::HebrewString,
+            };
 
         let struct_type = ident.map(|name| FieldType::Struct { name });
 
         let enum_type = ident
             .then_ignore(just(Token::LParen))
-            .then(int_base)
+            .then(int_type)
             .then_ignore(just(Token::RParen))
-            .map(|(name, base)| FieldType::Enum { name, base });
+            .map(|(name, (signed, width))| FieldType::Enum {
+                name,
+                signed,
+                width,
+            });
 
         let array_length = int_lit
             .map(|value| ArrayLength::Static { value })

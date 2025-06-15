@@ -56,25 +56,25 @@
 }
 
 .integer-value {
-    border-left: 4px solid #2ecc71 !important;
+    border-left: 4px solid #2ecc71;
 }
 
 .bigint-value {
-    border-left: 4px solid #9b59b6 !important;
+    border-left: 4px solid #9b59b6;
 }
 
 .float-value {
-    border-left: 4px solid #3498db !important;
+    border-left: 4px solid #3498db;
 }
 
 .string-value {
-    border-left: 4px solid #1abc9c !important;
+    border-left: 4px solid #1abc9c;
 }
 
 .enum-value {
-    border-left: 4px solid #f39c12 !important;
+    border-left: 4px solid #f39c12;
 }
 
 .unknown-value {
-    border-left: 4px solid #FF6EC7 !important;
+    border-left: 4px solid #FF6EC7;
 }

@@ -82,7 +82,7 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
       setParsedValue(undefined);
 
       // Use the Expr to parse the buffer
-      const value = expr.readValue(bytes, valueType);
+      const value = expr.decodeValue(bytes, valueType);
       setParsedValue(value);
 
 

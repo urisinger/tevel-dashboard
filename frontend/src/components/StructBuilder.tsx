@@ -32,175 +32,117 @@ function useValidated<T extends Value>(
   return [internal, setInternal] as const;
 }
 
-// Primitive Inputs
-const I8Input = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
-  const [val, setVal] = useValidated<number>(
-    typeof value === 'number' ? value : undefined,
-    (v): v is number => typeof v === 'number',
-    () => 0
-  );
-  return wrapInput(
-    name,
-    "I8",
-    <input
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      min={-128}
-      max={127}
-      value={val}
-      className="field-input integer-value"
-      onChange={e => {
-        const n = parseInt(e.target.value) || 0;
-        setVal(n);
-        onChange(n);
-      }}
-    />
-  );
-};
-
-// Similarly for I16, I32, I64, F32, F64, CString, HebrewString
-const I16Input = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
-  const [val, setVal] = useValidated<number>(
-    typeof value === 'number' ? value : undefined,
-    (v): v is number => typeof v === 'number',
-    () => 0
-  );
-  return wrapInput(
-    name,
-    "I16",
-    <input
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      min={-32768}
-      max={32767}
-      value={val}
-      className="field-input integer-value"
-      onChange={e => {
-        const n = parseInt(e.target.value) || 0;
-        setVal(n);
-        onChange(n);
-      }}
-    />
-  );
-};
-
-const I32Input = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
-  const [val, setVal] = useValidated<number>(
-    typeof value === 'number' ? value : undefined,
-    (v): v is number => typeof v === 'number',
-    () => 0
-  );
-  return wrapInput(
-    name,
-    "I32",
-    <input
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      value={val}
-      className="field-input integer-value"
-      onChange={e => {
-        const n = parseInt(e.target.value) || 0;
-        setVal(n);
-        onChange(n);
-      }}
-    />
-  );
-};
-
-const I64Input = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
-  const [val, setVal] = useValidated<bigint>(
-    typeof value === 'bigint' ? value : undefined,
-    (v): v is bigint => typeof v === 'bigint',
-    () => BigInt(0)
-  );
-  return wrapInput(
-    name,
-    "I64",
-    <input
-      type="number"
-      pattern="[0-9]*"
-      value={val.toString()}
-      className="field-input bigint-value"
-      onChange={e => {
-        let bi: bigint;
-        try { bi = BigInt(e.target.value); }
-        catch { bi = BigInt(0); }
-        setVal(bi);
-        onChange(bi);
-      }}
-    />
-  );
-};
-
-const F32Input = ({
-  name,
-  value,
-  onChange,
-}: {
+export const IntegerInput: React.FC<{
   name: string;
+  signed: boolean;
+  width: number;
   value?: Value;
   onChange: (v: Value) => void;
-}) => {
-  const [val, setVal] = useValidated<number>(
-    typeof value === "number" ? value : undefined,
-    (v): v is number => typeof v === "number",
-    () => 0
+}> = ({ name, signed, width, value, onChange }) => {
+  const typeKind = `${signed ? "i" : "u"}${width}`;
+
+  // text buffer + error message
+  const [text, setText] = useState<string>(
+    value !== undefined && typeof value === "bigint"
+      ? value.toString()
+      : "0"
   );
+  const [error, setError] = useState<string | null>(null);
+
+  // compute min/max as BigInt
+  const maxUnsigned = (1n << BigInt(width)) - 1n;
+  const minSigned = -(1n << BigInt(width - 1));
+  const maxSigned = (1n << BigInt(width - 1)) - 1n;
+
+  const handleChange = (t: string) => {
+    setText(t);
+
+    if (t === "" || t === "-" && signed) {
+      // empty or just "-" is allowed as partial
+      setError(null);
+      return;
+    }
+
+    try {
+      const bi = BigInt(t);
+
+      // range check
+      if (!signed) {
+        if (bi < 0n || bi > maxUnsigned) {
+          setError(`Must be 0 … ${maxUnsigned}`);
+          return;
+        }
+      } else {
+        if (bi < minSigned || bi > maxSigned) {
+          setError(`Must be ${minSigned} … ${maxSigned}`);
+          return;
+        }
+      }
+
+      // okay
+      setError(null);
+      onChange(bi);
+    } catch {
+      // not a valid bigint yet
+      setError(null);
+    }
+  };
 
   return wrapInput(
     name,
-    "F32",
-    <input
-      type="text"
-      value={val.toString()}
-      className="field-input float-value"
-      onChange={(e) => {
-        const text = e.target.value;
-        const n = parseFloat(text);
-        const final = Number.isNaN(n) ? 0 : n;
-        setVal(final);
-        onChange(final);
-      }}
-    />
+    typeKind,
+    <>
+      <input
+        type="text"
+        inputMode="numeric"
+        pattern={signed ? "[0-9\\-]*" : "[0-9]*"}
+        value={text}
+        className={`field-input integer-value ${error ? "invalid" : ""}`}
+        onChange={(e) => handleChange(e.target.value)}
+      />
+      {error && <div className="field-error">{error}</div>}
+    </>
   );
 };
 
-const F64Input = ({
-  name,
-  value,
-  onChange,
-}: {
+export const FloatInput: React.FC<{
   name: string;
+  width: 32 | 64;
   value?: Value;
   onChange: (v: Value) => void;
-}) => {
-  const [val, setVal] = useValidated<number>(
-    typeof value === "number" ? value : undefined,
-    (v): v is number => typeof v === "number",
-    () => 0
+}> = ({ name, width, value, onChange }) => {
+  const typeKind = `F${width}`;
+
+  const [text, setText] = useState<string>(
+    value !== undefined && typeof value === "number"
+      ? value.toString()
+      : "0"
   );
 
   return wrapInput(
     name,
-    "F64",
+    typeKind,
     <input
       type="text"
-      value={val.toString()}
+      inputMode="decimal"
+      value={text}
       className="field-input float-value"
       onChange={(e) => {
-        const text = e.target.value;
-        const n = parseFloat(text);
+        const t = e.target.value;
+        setText(t);
 
-        const final = Number.isNaN(n) ? 0 : n;
-        setVal(final);
-        onChange(final);
+        if (t === "") {
+          onChange(0);
+        }
+        const n = parseFloat(t);
+        if (!Number.isNaN(n)) {
+          onChange(n);
+        }
       }}
     />
   );
 };
+
 
 
 const StringInput = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
@@ -448,12 +390,9 @@ const ValueInput: React.FC<{
   onChange: (v: Value) => void;
 }> = ({ name, type, expr, parentFields, value, onChange }) => {
   switch (type.kind) {
-    case "i8": return <I8Input name={name} value={value} onChange={onChange} />;
-    case "i16": return <I16Input name={name} value={value} onChange={onChange} />;
-    case "i32": return <I32Input name={name} value={value} onChange={onChange} />;
-    case "i64": return <I64Input name={name} value={value} onChange={onChange} />;
-    case "f32": return <F32Input name={name} value={value} onChange={onChange} />;
-    case "f64": return <F64Input name={name} value={value} onChange={onChange} />;
+    case "Int": return <IntegerInput name={name} width={type.width} signed={type.signed} value={value} onChange={onChange} />;
+    case "f32": return <FloatInput name={name} width={32} value={value} onChange={onChange} />;
+    case "f64": return <FloatInput name={name} width={32} value={value} onChange={onChange} />;
     case "CString":
     case "HebrewString": return <StringInput name={name} value={value} onChange={onChange} />;
     case "Struct": {

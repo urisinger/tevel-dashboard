@@ -2,15 +2,12 @@
 pub enum Token<'a> {
     Identifier(&'a str),
     Integer(&'a str),
+    IntWidth { signed: bool, width: u8 },
+    F32,
+    F64,
     Match,
     Enum,
     Struct,
-    I8,
-    I16,
-    I32,
-    I64,
-    F32,
-    F64,
     CString,
     HebrewString,
 
@@ -100,20 +97,36 @@ impl<'a> Lexer<'a> {
         match self.peek()? {
             c if c.is_ascii_alphabetic() || c == '_' => {
                 let ident = self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
-                Some(match ident {
+
+                // 1) Zig-style bit-width ints: i1..i64 or u1..u64
+                if let Some((prefix, digits)) = ident.split_at(1).into() {
+                    if (prefix == "i" || prefix == "u")
+                        && !digits.is_empty()
+                        && digits.chars().all(|d| d.is_ascii_digit())
+                    {
+                        if let Ok(n) = digits.parse::<u8>() {
+                            if (1..=64).contains(&n) {
+                                return Some(Token::IntWidth {
+                                    signed: prefix == "i",
+                                    width: n,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 2) existing keywords
+                let tok = match ident {
                     "match" => Token::Match,
                     "enum" => Token::Enum,
                     "struct" => Token::Struct,
                     "CString" => Token::CString,
                     "HebrewString" => Token::HebrewString,
-                    "i8" => Token::I8,
-                    "i16" => Token::I16,
-                    "i32" => Token::I32,
-                    "i64" => Token::I64,
                     "f32" => Token::F32,
                     "f64" => Token::F64,
                     _ => Token::Identifier(ident),
-                })
+                };
+                return Some(tok);
             }
             c if c.is_ascii_digit() => {
                 let num = self.consume_while(|c| c.is_ascii_digit());

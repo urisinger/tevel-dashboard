@@ -98,23 +98,26 @@ const StructViewer: React.FC<{
             }
 
             default: {
-                if (typeof value === "object") {
-                    return undefined;
-                }
-                const display = value?.toString() ?? "—";
-                let typeLabel = type.kind as string;
-                if (type.kind === "Enum") typeLabel = `${type.name} (${type.base})`;
+                if (typeof value === "object") return undefined;
 
-                const classMap: Record<typeof type.kind, string> = {
-                    i8: "integer-value",
-                    i16: "integer-value",
-                    i32: "integer-value",
-                    i64: "bigint-value",
+                const display = value?.toString() ?? "—";
+
+                let typeLabel: string;
+                if (type.kind === "Int") {
+                    typeLabel = `${type.signed ? "i" : "u"}${type.width}`;
+                } else if (type.kind === "Enum") {
+                    typeLabel = `${type.name}<${type.width}>`;
+                } else {
+                    typeLabel = type.kind;
+                }
+
+                const classMap: Record<string, string> = {
+                    Int: "integer-value",
+                    Enum: "enum-value",
                     f32: "float-value",
                     f64: "float-value",
-                    Enum: "enum-value",
                     CString: "string-value",
-                    HebrewString: "string-value"
+                    HebrewString: "string-value",
                 };
 
                 const className = classMap[type.kind] || "unknown-value";
@@ -129,8 +132,8 @@ const StructViewer: React.FC<{
                     </div>
                 );
             }
-        }
-    };
+        };
+    }
 
 
 export default StructViewer;
