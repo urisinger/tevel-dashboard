@@ -1,3 +1,4 @@
+
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -16,6 +17,7 @@ use tokio::{
 
 use super::ApiState;
 
+/// Core TCP ↔ WebSocket proxy task (unchanged).
 pub async fn tcp_task(
     in_addr: SocketAddr,
     out_addr: SocketAddr,
@@ -48,6 +50,7 @@ pub async fn tcp_task(
         }
 
         tokio::select! {
+            // forward from WebSocket → TCP_IN
             Some(data) = rx_in.recv(), if tcp_in.is_some() => {
                 if let Err(e) = tcp_in.as_mut().unwrap().write_all(&data).await {
                     eprintln!("❌ write to IN failed: {}", e);
@@ -55,6 +58,7 @@ pub async fn tcp_task(
                 }
             }
 
+            // read from TCP_OUT → broadcast + history
             Ok((n, buf)) = async {
                 if let Some(sock) = tcp_out.as_mut() {
                     let mut buf = vec![0; 1024];
@@ -74,7 +78,9 @@ pub async fn tcp_task(
                         },
                         Err(_) => Err(()),
                     }
-                } else { Err(()) }
+                } else {
+                    Err(())
+                }
             }, if tcp_out.is_some() => {
                 let _ = tx_out.send(buf[..n].to_vec().into_boxed_slice());
             }
@@ -86,14 +92,23 @@ pub async fn tcp_task(
     }
 }
 
+/// HTTP handler for `/ws`—chooses proxy vs. echo mode.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(ApiState { tx_in, tx_out, .. }): State<ApiState>,
+    State(ApiState { tx_in, tx_out, ws_echo, dev, .. }): State<ApiState>,
 ) -> impl IntoResponse {
     let rx_out = tx_out.subscribe();
-    ws.on_upgrade(move |socket| handle_socket(socket, tx_in, rx_out))
+
+    if dev {
+        // broadcast‐style echo
+        ws.on_upgrade(move |socket| handle_echo_socket(socket, ws_echo.clone()))
+    } else {
+        // original TCP proxy
+        ws.on_upgrade(move |socket| handle_socket(socket, tx_in, rx_out))
+    }
 }
 
+/// Original proxy: send Binary frames → TCP_IN, and TCP_OUT → Binary frames.
 async fn handle_socket(
     socket: WebSocket,
     tx_in: mpsc::Sender<Box<[u8]>>,
@@ -118,5 +133,39 @@ async fn handle_socket(
     tokio::select! {
         _ = to_mgr => {},
         _ = to_ws => {},
+    }
+}
+
+async fn handle_echo_socket(
+    socket: WebSocket,
+    ws_echo_tx: broadcast::Sender<Message>,
+) {
+    let (mut tx, mut rx_ws) = socket.split();
+    let mut rx_echo = ws_echo_tx.subscribe();
+
+    let incoming = async {
+        while let Some(Ok(msg)) = rx_ws.next().await {
+            // Broadcast to everyone (including sender)
+            let to_send = match msg.clone() {
+                Message::Text(t)   => Message::Text(t),
+                Message::Binary(b) => Message::Binary(b),
+                other              => other,
+            };
+            let _ = ws_echo_tx.send(to_send);
+        }
+    };
+
+    // Channel → client
+    let outgoing = async {
+        while let Ok(msg) = rx_echo.recv().await {
+            if tx.send(msg).await.is_err() {
+                break;
+            }
+        }
+    };
+
+    tokio::select! {
+        _ = incoming => {},
+        _ = outgoing => {},
     }
 }

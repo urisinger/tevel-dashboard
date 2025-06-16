@@ -31,7 +31,7 @@ async fn main() {
     let app = Router::new();
 
     #[cfg(feature = "api")]
-    let app = app.nest("/api", api_service(args.api_opts).await.0);
+    let app = app.nest("/api", api_service(args.api_opts).await);
 
     #[cfg(feature = "static-files")]
     let app = app

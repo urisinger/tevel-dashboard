@@ -37,6 +37,10 @@ pub struct ApiOpts {
     #[clap(long, default_value_t = 16)]
     pub out_broadcast_capacity: usize,
 
+    /// Enable WebSocket echo & broadcast mode
+    #[clap(long)]
+    pub dev: bool,
+
     #[arg(long)]
     structs: Option<PathBuf>,
 }
@@ -45,21 +49,31 @@ pub struct ApiOpts {
 struct ApiState {
     tx_in: mpsc::Sender<Box<[u8]>>,
     tx_out: broadcast::Sender<Box<[u8]>>,
+    ws_echo: broadcast::Sender<axum::extract::ws::Message>,
     recv_history: Arc<RwLock<VecDeque<Box<[u8]>>>>,
+    dev: bool,
 }
 
 static STRUCTS_JSON: LazyLock<Arc<RwLock<Option<Value>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(None)));
 
-pub async fn api_service<S>(opt: ApiOpts) -> (Router<S>, JoinHandle<()>) {
+pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
+    // Channels for TCP proxy
     let (tx_in, rx_in) = mpsc::channel::<Box<[u8]>>(opt.in_chan_capacity);
     let tx_out = broadcast::Sender::<Box<[u8]>>::new(opt.out_broadcast_capacity);
+
+    // Channel for WS echo/broadcast
+    let (ws_echo_tx, _) = broadcast::channel::<axum::extract::ws::Message>(64);
+
     let state = ApiState {
         tx_in,
         tx_out: tx_out.clone(),
+        ws_echo: ws_echo_tx.clone(),
         recv_history: Default::default(),
+        dev: opt.dev,
     };
 
+    // Optional structs.json loading
     if let Some(path) = opt.structs.as_ref() {
         load_structs_once(path).await;
         watch_structs_file(path.clone());
@@ -70,23 +84,22 @@ pub async fn api_service<S>(opt: ApiOpts) -> (Router<S>, JoinHandle<()>) {
     let in_addr = opt.in_addr;
     let out_addr = opt.out_addr;
 
-    let tcp_task = tokio::spawn(tcp_task(
+    if !opt.dev{
+    tokio::spawn(tcp_task(
         in_addr,
         out_addr,
         retry_delay,
         rx_in,
         tx_out,
         recv_history,
-    ));
+    ));}
 
-    let app = Router::new()
+    Router::new()
         .route("/ws/", get(ws_handler))
         .route("/history", get(history_handler))
         .route("/structs.json", get(serve_structs_json))
-        .with_state(state);
-
-    (app, tcp_task)
-}
+        .with_state(state)
+    }
 
 async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
     let hist = state.recv_history.read().await;
