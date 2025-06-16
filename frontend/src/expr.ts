@@ -21,17 +21,12 @@ export type ArrayLength =
   | { kind: "Static"; value: number }
   | { kind: "Dynamic"; field: string };
 
-export type FieldType =
+export type FieldType = (
   | { kind: "Struct"; name: string }
   | {
     kind: "Array";
     elementType: FieldType;
     length: ArrayLength;
-  }
-  | {
-    kind: "Enum";
-    name: string;
-    width: number;
   }
   | {
     kind: "Match";
@@ -40,14 +35,21 @@ export type FieldType =
     cases: { [caseName: string]: FieldType };
   }
   | {
+    kind: "Enum";
+    name: string;
+    width: number;
+    default?: string;
+  }
+  | {
     kind: "Int";
     signed: boolean;
     width: number;
+    default?: number;
   }
-  | { kind: "f32" }
-  | { kind: "f64" }
-  | { kind: "CString" }
-  | { kind: "HebrewString" };
+  | { kind: "f32", default?: number }
+  | { kind: "f64", default?: number }
+  | { kind: "CString", default?: string }
+  | { kind: "HebrewString", default?: string });
 
 
 export interface Struct {
@@ -91,28 +93,55 @@ export class Expr {
     options: {
       value?: Value;
       parentFields?: ValueMap;
+      parentFieldTypes?: [string, FieldType][];
       mode: "min" | "max" | "default";
     }
   ): number {
-    const { value, parentFields, mode } = options;
+    const { value, parentFields, parentFieldTypes, mode } = options;
 
     switch (type.kind) {
-      // ─── Fixed‐width ints ───
       case "Int":
         return type.width;
-
-      // ─── Floats ───
       case "f32":
         return 32;
       case "f64":
         return 64;
-
-      // ─── Enums (backed by an integer width) ───
       case "Enum":
         return type.width;
+      case "CString": {
+        const str: string | undefined =
+          typeof value === "string"
+            ? value
+            : mode === "default" && type.default !== undefined
+              ? type.default
+              : undefined;
+
+        if (str !== undefined) {
+          const encoded = new TextEncoder().encode(str);
+          return encoded.length * 8;
+        } else {
+          return mode === "max" ? Infinity : 1;
+        }
+      }
+
+      case "HebrewString": {
+        const str: string | undefined =
+          typeof value === "string"
+            ? value
+            : mode === "default" && type.default !== undefined
+              ? type.default
+              : undefined;
+
+        if (str !== undefined) {
+          const encoded = new HebrewEncoder().encode(str);
+          return encoded.length;
+        } else {
+          return mode === "max" ? Infinity : 1;
+        }
+      }
 
 
-      // TODO: Use reduce(will do after refactor is over)
+
       case "Struct": {
         const struct = this.get(type.name);
         if (!struct) throw new Error(`Unknown struct '${type.name}'`);
@@ -128,6 +157,7 @@ export class Expr {
           total += this.sizeOfBits(fieldType, {
             value: fieldVal,
             parentFields: fieldMap,
+            parentFieldTypes: struct.fields,
             mode
           });
         }
@@ -148,24 +178,37 @@ export class Expr {
           return this.sizeOfBits(caseType, {
             value,
             parentFields,
+            parentFieldTypes,
             mode
           });
         }
 
         if (mode === "default") {
-          const defaultEnumVal = this.getEnum(type.enumTypeName)?.keys().next().value;
+          const enumFieldTuple = parentFieldTypes
+            ?.find(([fieldName, _fieldType]) => fieldName === type.discriminant);
+          let defaultEnumVal: string | undefined = undefined;
+          if (enumFieldTuple) {
+            const [, enumFT] = enumFieldTuple;
+            if (enumFT.kind === "Enum" && enumFT.default !== undefined) {
+              defaultEnumVal = enumFT.default;
+            }
+          }
+          if (!defaultEnumVal) {
+            defaultEnumVal = this.getEnum(type.enumTypeName)?.keys().next().value;
+          }
           const defaultVal = defaultEnumVal && type.cases[defaultEnumVal];
           if (!defaultVal) return 0;
           return this.sizeOfBits(defaultVal, {
             value: undefined,
             parentFields,
+            parentFieldTypes,
             mode
           });
         }
 
         let best = mode === "max" ? 0 : Infinity;
         for (const ct of Object.values(type.cases)) {
-          const size = this.sizeOfBits(ct, { value: undefined, parentFields, mode });
+          const size = this.sizeOfBits(ct, { value: undefined, parentFields, parentFieldTypes, mode });
           if (mode === "max") best = Math.max(best, size);
           else best = Math.min(best, size);
         }
@@ -177,7 +220,8 @@ export class Expr {
         if (type.length.kind === "Static") {
           length = type.length.value;
         } else if (type.length.kind === "Dynamic") {
-          const lenField = parentFields?.[type.length.field];
+          const field = type.length.field;
+          const lenField = parentFields?.[field];
           if (typeof lenField === "number") {
             length = lenField;
           } else if (typeof lenField == "bigint") {
@@ -187,9 +231,18 @@ export class Expr {
               case "max":
                 return Infinity;
               case "default":
+                const intFieldTuple = parentFieldTypes
+                  ?.find(([fieldName, _fieldType]) => fieldName === field);
+                if (intFieldTuple) {
+                  const [, intFT] = intFieldTuple;
+                  if (intFT.kind === "Int" && intFT.default !== undefined) {
+                    length = intFT.default;
+                    break;
+                  }
+                }
+                return 0;
               case "min":
-                length = 0;
-                break;
+                return 0;
             }
           }
         }
@@ -201,40 +254,11 @@ export class Expr {
         const elementSize = this.sizeOfBits(type.elementType, {
           value: undefined,
           parentFields,
+          parentFieldTypes,
           mode,
         });
 
         return length * elementSize;
-      }
-      case "CString": {
-        if (typeof value == "string") {
-          const encoded = new TextEncoder().encode(value);
-          return encoded.length;
-        } else {
-          switch (mode) {
-            case "default":
-            case "min":
-              return 0;
-            case "max":
-              return Infinity;
-          }
-        }
-        break;
-      }
-      case "HebrewString": {
-        if (typeof value == "string") {
-          const encoded = new HebrewEncoder().encode(value);
-          return encoded.length;
-        } else {
-          switch (mode) {
-            case "default":
-            case "min":
-              return 0;
-            case "max":
-              return Infinity;
-          }
-        }
-        break;
       }
     }
   }
@@ -244,22 +268,22 @@ export class Expr {
     return Math.ceil(bits / 8);
   }
 
-  minSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap) {
+  minSizeOf(type: FieldType, value?: Value, parentFieldTypes?: [string, FieldType][], parentFields?: ValueMap) {
     const b = this.sizeOfBits(type, {
-      mode: "min", value, parentFields,
+      mode: "min", value, parentFieldTypes, parentFields,
     });
     return this.bitsToBytes(b);
   }
-  maxSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap) {
+  maxSizeOf(type: FieldType, value?: Value, parentFieldTypes?: [string, FieldType][], parentFields?: ValueMap) {
     const b = this.sizeOfBits(type, {
-      mode: "max", value, parentFields,
+      mode: "max", value, parentFieldTypes, parentFields,
     });
     return this.bitsToBytes(b);
   }
 
-  defaultSizeOf(type: FieldType, value?: Value, parentFields?: ValueMap) {
+  defaultSizeOf(type: FieldType, value?: Value, parentFieldTypes?: [string, FieldType][], parentFields?: ValueMap) {
     const b = this.sizeOfBits(type, {
-      mode: "default", value, parentFields,
+      mode: "default", value, parentFieldTypes, parentFields,
     });
     return this.bitsToBytes(b);
   }
@@ -268,7 +292,8 @@ export class Expr {
   valueMatchesType(
     val: Value | undefined,
     type: FieldType,
-    parentFields?: ValueMap
+    parentFields?: ValueMap,
+    parentFieldTypes?: [string, FieldType][]
   ): boolean {
     switch (type.kind) {
       case "Int":
@@ -285,22 +310,37 @@ export class Expr {
       case "HebrewString":
         return typeof val === "string";
 
-      case "Struct":
-        return typeof val === "object" && val !== null && !Array.isArray(val);
+      case "Struct": {
+        if (typeof val !== "object") return false;
+        const structVal = val as ValueMap;
+        let types: [string, FieldType][] = parentFieldTypes ? [...parentFieldTypes] : [];
+        for (const [fieldName, fieldType] of this.get(type.name)!.fields) {
+          const fieldVal = structVal[fieldName];
+          // append this field's type for children lookups
+          types.push([fieldName, fieldType]);
+          if (!this.valueMatchesType(fieldVal, fieldType, structVal, types)) {
+            return false;
+          }
+        }
+        return true;
+      }
 
       case "Match": {
         if (typeof val !== "object" || val === null) return false;
-        const discr = parentFields?.[type.discriminant];
-        const key =
-          typeof discr === "string"
-            ? discr
-            : this.getEnum(type.enumTypeName)?.keys().next().value;
-        if (typeof key !== "string") return false;
-
-        const caseType = type.cases[key];
+        // find live discriminator value
+        let discrKey = parentFields?.[type.discriminant] as string | undefined;
+        // if missing, try enum's default from parentFieldTypes
+        if (discrKey === undefined) {
+          const entry = parentFieldTypes?.find(([name]) => name === type.discriminant);
+          if (entry && entry[1].kind === "Enum" && entry[1].default !== undefined) {
+            discrKey = entry[1].default;
+          }
+        }
+        if (typeof discrKey !== "string") return false;
+        const caseType = type.cases[discrKey];
         if (!caseType) return false;
-
-        return this.valueMatchesType(val, caseType, val as ValueMap);
+        // recurse, val itself becomes new parentFields
+        return this.valueMatchesType(val as ValueMap, caseType, val as ValueMap, parentFieldTypes);
       }
 
       case "Array": {
@@ -309,16 +349,29 @@ export class Expr {
         if (type.length.kind === "Static") {
           expectedLen = type.length.value;
         } else {
+          // dynamic: value lives in parentFields
           const lf = parentFields?.[type.length.field];
-          expectedLen =
-            typeof lf === "number" ? lf :
-              typeof lf === "bigint" ? Number(lf) :
-                0;
+          expectedLen = typeof lf === "number"
+            ? lf
+            : typeof lf === "bigint"
+              ? Number(lf)
+              : 0;
         }
-        return val.length === expectedLen;
+        if (val.length !== expectedLen) return false;
+        // element type recursion
+        return (val as Value[]).every((el) =>
+          this.valueMatchesType(
+            el,
+            type.elementType,
+            parentFields,
+            parentFieldTypes
+          )
+        );
       }
     }
   }
+
+
   encodeValue(value: Value, ty: string): ArrayBuffer {
     const writer = new BitWriter();
     this.writeValueHelper(value, { kind: "Struct", name: ty }, writer);
@@ -450,22 +503,28 @@ export class Expr {
 
   defaultValue(
     type: FieldType,
-    parentFields?: ValueMap
+    parentFields?: ValueMap,
+    parentFieldTypes?: [string, FieldType][]
   ): Value {
     switch (type.kind) {
       case "Int":
-        return 0n;
+        return (type.default && BigInt(type.default)) ?? 0n;
 
       case "f32":
       case "f64":
-        return 0;
+        return type.default ?? 0;
 
       case "Enum": {
         const enumDef = this.getEnum(type.name);
-        if (!enumDef || enumDef.size === 0)
-          throw new Error(`Enum '${type.name}' not found or empty`);
-        const firstKey = Array.from(enumDef.keys())[0];
-        return firstKey;
+        if (!enumDef) throw new Error(`Enum '${type.name}' not found`);
+        const dv = type.default;
+        if (dv !== undefined && enumDef.has(dv)) {
+          return dv;
+        }
+
+        const firstKey = enumDef?.keys().next().value;
+        if (firstKey === undefined) throw new Error(`Enum '${type.name}' not found or empty`)
+        return firstKey
       }
 
       case "Struct": {
@@ -476,7 +535,7 @@ export class Expr {
 
         for (const [fieldName, fieldType] of struct.fields) {
           const fieldVal =
-            this.defaultValue(fieldType, fields);
+            this.defaultValue(fieldType, fields, parentFieldTypes);
           fields[fieldName] = fieldVal;
         }
 
@@ -491,28 +550,34 @@ export class Expr {
           throw new Error(
             `No variant in match '${type.discriminant}' for enum value '${key}'`
           );
-        return this.defaultValue(variantType, parentFields);
+        return this.defaultValue(variantType, parentFields, parentFieldTypes);
       }
       case "Array": {
         const len =
           type.length.kind === "Static"
             ? type.length.value
             : (() => {
-              const val = parentFields?.[type.length.field];
-              if (typeof val === "number") return val;
-              if (typeof val === "bigint") return Number(val);
+              const v = parentFields?.[type.length.field];
+              if (typeof v === "number") return v;
+              if (typeof v === "bigint") return Number(v);
               return 0;
             })();
 
-        return Array.from({ length: len }, () =>
-          this.defaultValue(type.elementType, parentFields)
+        const count = Math.max(0, len);
+        return Array.from({ length: count }, () =>
+          this.defaultValue(
+            type.elementType,
+            parentFields,
+            parentFieldTypes
+          )
         );
       }
+
       case "CString": {
-        return "";
+        return type.default ?? "";
       }
       case "HebrewString":
-        return "";
+        return type.default ?? "";
     }
   }
 
@@ -609,10 +674,10 @@ export class Expr {
               typeof lf === "bigint" ? Number(lf) :
                 0;
         }
-        const arr: Value[] = [];
+        const arr: (Value | undefined)[] = [];
         for (let i = 0; i < length; i++) {
           const v = this.readValueHelper(reader, type.elementType, parentFields);
-          arr.push(v === undefined ? this.defaultValue(type.elementType, parentFields) : v);
+          arr.push(v);
         }
         return arr;
       }

@@ -2,7 +2,9 @@
 pub enum Token<'a> {
     Identifier(&'a str),
     Integer(&'a str),
-    IntWidth { signed: bool, width: u8 },
+    Float(&'a str),
+    StringLiteral(String),
+    IntLit { signed: bool, width: u8 },
     F32,
     F64,
     Match,
@@ -65,6 +67,38 @@ impl<'a> Lexer<'a> {
         &self.input[start..self.pos]
     }
 
+    fn lex_number(&mut self, start_pos: usize) -> Option<Token<'a>> {
+        let mut has_dot = false;
+
+        let _int = self.consume_while(|c| c.is_ascii_digit());
+
+        if self.peek() == Some('.') {
+            has_dot = true;
+            self.bump();
+            let _frac = self.consume_while(|c| c.is_ascii_digit());
+        }
+
+        if matches!(self.peek(), Some('e' | 'E')) {
+            has_dot = true;
+            self.bump();
+            if matches!(self.peek(), Some('+') | Some('-')) {
+                self.bump();
+            }
+            let _exp = self.consume_while(|c| c.is_ascii_digit());
+        }
+
+        if self.pos == start_pos {
+            return None;
+        }
+
+        let slice = &self.input[start_pos..self.pos];
+        Some(if has_dot {
+            Token::Float(slice)
+        } else {
+            Token::Integer(slice)
+        })
+    }
+
     fn skip_whitespace(&mut self) {
         self.consume_while(|c| c.is_whitespace());
     }
@@ -94,7 +128,61 @@ impl<'a> Lexer<'a> {
 
     pub fn next_token(&mut self) -> Option<Token<'a>> {
         self.skip_trivia();
+        let start_pos = self.pos;
         match self.peek()? {
+            //–– Number or negative number
+            '-' => {
+                // peek ahead – if next is digit or “.digit” → treat as number:
+                if self.input[self.pos + 1..]
+                    .chars()
+                    .next()
+                    .map_or(false, |c| c.is_ascii_digit() || c == '.')
+                {
+                    self.bump(); // consume '-'
+                    return self.lex_number(start_pos);
+                } else {
+                    self.bump();
+                    return Some(Token::Unknown('-'));
+                }
+            }
+
+            '0'..='9' | '.' => {
+                // digit or leading dot → number
+                return self.lex_number(start_pos);
+            }
+            '"' => {
+                self.bump();
+                let mut content = String::new();
+                while let Some(c) = self.peek() {
+                    if c == '"' {
+                        break;
+                    }
+                    if c == '\\' {
+                        self.bump();
+                        if let Some(esc) = self.peek() {
+                            let escaped_char = match esc {
+                                'n' => '\n',
+                                't' => '\t',
+                                'r' => '\r',
+                                '\\' => '\\',
+                                '"' => '"',
+                                other => other,
+                            };
+                            content.push(escaped_char);
+                            self.bump();
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+                    content.push(c);
+                    self.bump();
+                }
+                if self.peek() == Some('"') {
+                    self.bump();
+                }
+                return Some(Token::StringLiteral(content));
+            }
             c if c.is_ascii_alphabetic() || c == '_' => {
                 let ident = self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
 
@@ -106,7 +194,7 @@ impl<'a> Lexer<'a> {
                     {
                         if let Ok(n) = digits.parse::<u8>() {
                             if (1..=64).contains(&n) {
-                                return Some(Token::IntWidth {
+                                return Some(Token::IntLit {
                                     signed: prefix == "i",
                                     width: n,
                                 });

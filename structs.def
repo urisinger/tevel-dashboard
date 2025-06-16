@@ -30,8 +30,8 @@ struct TriangleData {
 }
 
 struct DrawingMetadata {
-  test: i1,
-  language: Language(i8),
+  test: i2 = 1,
+  language: Language(i8) = Hebrew,
   title: match language: Language{
     English => CString,
     Hebrew => HebrewString,
@@ -57,6 +57,6 @@ struct Main {
   metadata: DrawingMetadata,
   shapeCount: i16,
   shapes: [Shape; shapeCount], // dynamic array
-  scaleFactors: [f64; 3],      // static array
+  scaleFactors: [f64 = 0.3; 3],      // static array
   caption: HebrewString        // Hebrew-encoded string
 }

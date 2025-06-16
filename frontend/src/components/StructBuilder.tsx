@@ -36,16 +36,17 @@ export const IntegerInput: React.FC<{
   name: string;
   signed: boolean;
   width: number;
+  defaultNumber: number;
   value?: Value;
   onChange: (v: Value) => void;
-}> = ({ name, signed, width, value, onChange }) => {
+}> = ({ name, signed, width, value, defaultNumber, onChange }) => {
   const typeKind = `${signed ? "i" : "u"}${width}`;
 
   // text buffer + error message
   const [text, setText] = useState<string>(
     value !== undefined && typeof value === "bigint"
       ? value.toString()
-      : "0"
+      : defaultNumber.toString()
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -108,15 +109,16 @@ export const IntegerInput: React.FC<{
 export const FloatInput: React.FC<{
   name: string;
   width: 32 | 64;
+  defaultNumber: number,
   value?: Value;
   onChange: (v: Value) => void;
-}> = ({ name, width, value, onChange }) => {
+}> = ({ name, width, value, defaultNumber, onChange }) => {
   const typeKind = `F${width}`;
 
   const [text, setText] = useState<string>(
     value !== undefined && typeof value === "number"
       ? value.toString()
-      : "0"
+      : defaultNumber.toString()
   );
 
   return wrapInput(
@@ -264,29 +266,28 @@ export const EnumInput: React.FC<{
   onChange: (v: string) => void;
 }> = ({ name, type, expr, value, onChange }) => {
   const enumDef = expr.getEnum(type.name);
-  const entries = useMemo(
-    () => (enumDef ? Array.from(enumDef.entries()) : []),
-    [enumDef]
-  );
 
   const defaultKey = useMemo(() => {
-    const dv = expr.defaultValue(type) as string;
-    return entries.some(([k]) => k === dv) ? dv : entries[0]?.[0] ?? "";
-  }, [entries, expr, type]);
+    return expr.defaultValue(type) as string;
+  }, [enumDef, expr, type]);
 
-  const [selected, setSelected] = useState<string>(() =>
-    entries.some(([k]) => k === value) ? (typeof value === "string" ? value : defaultKey) : defaultKey
-  );
+  const [selected, setSelected] = useState<string>(() => {
+    if (typeof value === "string" && enumDef?.has(value)) {
+      return value;
+    }
+    return defaultKey;
+  });
 
-  // Sync whenever `value`, `entries` or `defaultKey` change
   useEffect(() => {
-    if (entries.some(([k]) => k === value)) {
-      setSelected(value as string);
-    } else {
-      setSelected(defaultKey);
+    const isValid = typeof value === "string" && enumDef?.has(value);
+    const newSelected = isValid ? (value as string) : defaultKey;
+    setSelected(newSelected);
+
+    if (!isValid) {
       onChange(defaultKey);
     }
-  }, [value, entries, defaultKey, onChange]);
+  }, [value, defaultKey, enumDef]);
+
 
   if (!enumDef) {
     return <div className="error-message">Enum "{type.name}" not found</div>;
@@ -305,7 +306,7 @@ export const EnumInput: React.FC<{
           onChange(e.target.value);
         }}
       >
-        {entries.map(([label]) => (
+        {[...enumDef.keys()].map(label => (
           <option key={label} value={label}>
             {label}
           </option>
@@ -362,7 +363,6 @@ export const MatchInput: React.FC<{
     );
   }
 
-  // 4) And finally render the real input
   return (
     <div className="match-container">
       <ValueInput
@@ -390,9 +390,9 @@ const ValueInput: React.FC<{
   onChange: (v: Value) => void;
 }> = ({ name, type, expr, parentFields, value, onChange }) => {
   switch (type.kind) {
-    case "Int": return <IntegerInput name={name} width={type.width} signed={type.signed} value={value} onChange={onChange} />;
-    case "f32": return <FloatInput name={name} width={32} value={value} onChange={onChange} />;
-    case "f64": return <FloatInput name={name} width={32} value={value} onChange={onChange} />;
+    case "Int": return <IntegerInput name={name} width={type.width} signed={type.signed} defaultNumber={type.default ?? 0} value={value} onChange={onChange} />;
+    case "f32": return <FloatInput name={name} width={32} value={value} defaultNumber={type.default ?? 0} onChange={onChange} />;
+    case "f64": return <FloatInput name={name} width={32} value={value} defaultNumber={type.default ?? 0} onChange={onChange} />;
     case "CString":
     case "HebrewString": return <StringInput name={name} value={value} onChange={onChange} />;
     case "Struct": {
