@@ -1,9 +1,9 @@
 import { createContext, useContext } from 'react';
 import { ReadyState } from 'react-use-websocket';
-import { WebSocketLike, WebSocketMessage } from 'react-use-websocket/dist/lib/types';
+import { SendMessage, WebSocketLike } from 'react-use-websocket/dist/lib/types';
 
 export interface WebSocketContextType {
-    sendMessage: (message: WebSocketMessage, keep?: boolean) => void;
+    sendMessage: SendMessage;
     getWebSocket: () => WebSocketLike | null;
     readyState: ReadyState;
 }

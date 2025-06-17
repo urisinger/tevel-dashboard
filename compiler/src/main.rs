@@ -15,17 +15,11 @@ fn main() {
         std::process::exit(1);
     });
 
-    match compile(&source) {
-        Ok(json) => {
-            let output_path = std::path::Path::new(&args[1]).with_extension("json");
-            fs::write(&output_path, json).unwrap_or_else(|e| {
-                eprintln!("Failed to write output file: {}", e);
-                std::process::exit(1);
-            });
-        }
-        Err(msg) => {
-            eprintln!("{}", msg);
+    if let Some(json) = compile(&source) {
+        let output_path = std::path::Path::new(&args[1]).with_extension("json");
+        fs::write(&output_path, json).unwrap_or_else(|e| {
+            eprintln!("Failed to write output file: {}", e);
             std::process::exit(1);
-        }
+        });
     }
 }

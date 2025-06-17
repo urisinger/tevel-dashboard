@@ -1,3 +1,7 @@
+use std::fmt;
+
+use chumsky::span::SimpleSpan;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'a> {
     Identifier(&'a str),
@@ -28,6 +32,42 @@ pub enum Token<'a> {
 
     Unknown(char),
 }
+
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Identifier(s) => write!(f, "{}", s),
+            Token::Integer(s) => write!(f, "{}", s),
+            Token::Float(s) => write!(f, "{}", s),
+            Token::StringLiteral(s) => write!(f, "{}", s),
+            Token::IntLit { signed, width } => {
+                write!(f, "{}{}", if *signed { "i" } else { "u" }, width)
+            }
+            Token::F32 => write!(f, "f32"),
+            Token::F64 => write!(f, "f64"),
+            Token::Match => write!(f, "match"),
+            Token::Enum => write!(f, "enum"),
+            Token::Struct => write!(f, "struct"),
+            Token::CString => write!(f, "CString"),
+            Token::HebrewString => write!(f, "HebrewString"),
+            Token::LBrace => write!(f, "{{"),
+            Token::RBrace => write!(f, "}}"),
+            Token::LBracket => write!(f, "["),
+            Token::RBracket => write!(f, "]"),
+            Token::LParen => write!(f, "("),
+            Token::RParen => write!(f, ")"),
+            Token::Colon => write!(f, ":"),
+            Token::Comma => write!(f, ","),
+            Token::Semicolon => write!(f, ";"),
+            Token::Equal => write!(f, "="),
+            Token::FatArrow => write!(f, "=>"),
+            Token::Unknown(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+pub type Span = SimpleSpan;
+pub type Spanned<T> = (T, Span);
 
 pub struct Lexer<'a> {
     input: &'a str,
@@ -126,30 +166,27 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Option<Token<'a>> {
+    pub fn next_token(&mut self) -> Option<Spanned<Token<'a>>> {
         self.skip_trivia();
-        let start_pos = self.pos;
-        match self.peek()? {
+        let start = self.pos;
+        let tok = match self.peek()? {
             //–– Number or negative number
             '-' => {
                 // peek ahead – if next is digit or “.digit” → treat as number:
                 if self.input[self.pos + 1..]
                     .chars()
                     .next()
-                    .map_or(false, |c| c.is_ascii_digit() || c == '.')
+                    .is_some_and(|c| c.is_ascii_digit() || c == '.')
                 {
                     self.bump(); // consume '-'
-                    return self.lex_number(start_pos);
+                    self.lex_number(start)
                 } else {
                     self.bump();
-                    return Some(Token::Unknown('-'));
+                    Some(Token::Unknown('-'))
                 }
             }
 
-            '0'..='9' | '.' => {
-                // digit or leading dot → number
-                return self.lex_number(start_pos);
-            }
+            '0'..='9' | '.' => self.lex_number(start),
             '"' => {
                 self.bump();
                 let mut content = String::new();
@@ -181,12 +218,11 @@ impl<'a> Lexer<'a> {
                 if self.peek() == Some('"') {
                     self.bump();
                 }
-                return Some(Token::StringLiteral(content));
+                Some(Token::StringLiteral(content))
             }
             c if c.is_ascii_alphabetic() || c == '_' => {
                 let ident = self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
 
-                // 1) Zig-style bit-width ints: i1..i64 or u1..u64
                 if let Some((prefix, digits)) = ident.split_at(1).into() {
                     if (prefix == "i" || prefix == "u")
                         && !digits.is_empty()
@@ -194,16 +230,18 @@ impl<'a> Lexer<'a> {
                     {
                         if let Ok(n) = digits.parse::<u8>() {
                             if (1..=64).contains(&n) {
-                                return Some(Token::IntLit {
-                                    signed: prefix == "i",
-                                    width: n,
-                                });
+                                return Some((
+                                    Token::IntLit {
+                                        signed: prefix == "i",
+                                        width: n,
+                                    },
+                                    (start..self.pos).into(),
+                                ));
                             }
                         }
                     }
                 }
 
-                // 2) existing keywords
                 let tok = match ident {
                     "match" => Token::Match,
                     "enum" => Token::Enum,
@@ -214,7 +252,7 @@ impl<'a> Lexer<'a> {
                     "f64" => Token::F64,
                     _ => Token::Identifier(ident),
                 };
-                return Some(tok);
+                Some(tok)
             }
             c if c.is_ascii_digit() => {
                 let num = self.consume_while(|c| c.is_ascii_digit());
@@ -243,10 +281,12 @@ impl<'a> Lexer<'a> {
                     _ => Token::Unknown(c),
                 })
             }
-        }
+        };
+
+        tok.map(|tok| (tok, (start..self.pos).into()))
     }
 
-    pub fn tokenize(&mut self) -> Vec<Token<'a>> {
+    pub fn tokenize(&mut self) -> Vec<Spanned<Token<'a>>> {
         let mut tokens = Vec::new();
         while let Some(tok) = self.next_token() {
             tokens.push(tok);

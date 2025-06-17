@@ -1,134 +1,91 @@
-use chumsky::{prelude::*, primitive::select};
-use serde::{Deserialize, Serialize};
+use chumsky::{input::ValueInput, prelude::*};
 use std::collections::HashMap;
 
-use crate::lexer::Token;
+use crate::{
+    definition::{ArrayLength, Definition, FieldType},
+    lexer::{Span, Token},
+};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Definition {
-    Struct {
-        name: String,
-        fields: Vec<(String, FieldType)>,
-    },
-    Enum {
-        name: String,
-        entries: Vec<(String, i64)>,
-    },
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum FieldType {
-    Struct {
-        name: String,
-    },
-    Array {
-        #[serde(rename = "elementType")]
-        element_type: Box<FieldType>,
-        length: ArrayLength,
-    },
-    Match {
-        discriminant: String,
-        #[serde(rename = "enumTypeName")]
-        enum_type_name: String,
-        cases: HashMap<String, FieldType>,
-    },
-    Enum {
-        name: String,
-        signed: bool,
-        width: u8,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<String>,
-    },
-    Int {
-        signed: bool,
-        width: u8,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<i64>,
-    },
-    #[serde(rename = "f32")]
-    F32 {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<f32>,
-    },
-    #[serde(rename = "f64")]
-    F64 {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<f64>,
-    },
-    CString {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<String>,
-    },
-    HebrewString {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        default: Option<String>,
-    },
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum ArrayLength {
-    Static { value: u32 },
-    Dynamic { field: String },
-}
-
-pub fn parser<'a>(
-) -> impl Parser<'a, &'a [Token<'a>], Vec<Definition>, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>>
+pub fn parser<'tokens, 'src: 'tokens, I>(
+) -> impl Parser<'tokens, I, Vec<Definition>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
-    let ident = select! { Token::Identifier(name) => name.to_string() };
-    let int_lit = select! { Token::Integer(num) => num.parse::<i64>().unwrap() };
+    let ident = select! { Token::Identifier(name) => name.to_string() }.labelled("identifier");
+    let int_lit =
+        select! { Token::Integer(num) => num.parse::<i64>().unwrap() }.labelled("integer literal");
 
-    let field_type = field_type_parser();
+    let field_type = type_parser().labelled("type");
 
     let field = ident.then_ignore(just(Token::Colon)).then(field_type);
 
+    let struct_body = field
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .recover_with(via_parser(nested_delimiters(
+            Token::LBrace,
+            Token::RBrace,
+            [
+                (Token::LParen, Token::RParen),
+                (Token::LBracket, Token::RBracket),
+            ],
+            |_| Vec::new(),
+        )));
+
     let struct_def = just(Token::Struct)
         .ignore_then(ident)
-        .then_ignore(just(Token::LBrace))
-        .then(
-            field
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBrace))
+        .then(struct_body)
         .map(|(name, fields)| Definition::Struct { name, fields });
 
     let enum_entry = ident.then_ignore(just(Token::Equal)).then(int_lit);
 
+    let enum_body = enum_entry
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .recover_with(via_parser(nested_delimiters(
+            Token::LBrace,
+            Token::RBrace,
+            [
+                (Token::LParen, Token::RParen),
+                (Token::LBracket, Token::RBracket),
+            ],
+            |_| Vec::new(),
+        )));
+
     let enum_def = just(Token::Enum)
         .ignore_then(ident)
-        .then_ignore(just(Token::LBrace))
-        .then(
-            enum_entry
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBrace))
+        .then(enum_body)
         .map(|(name, entries)| Definition::Enum { name, entries });
 
-    struct_def.or(enum_def).repeated().collect()
+    struct_def.or(enum_def).repeated().collect::<Vec<_>>()
 }
 
-fn field_type_parser<'a>(
-) -> impl Parser<'a, &'a [Token<'a>], FieldType, extra::Err<Rich<'a, Token<'a>, SimpleSpan>>> {
+fn type_parser<'tokens, 'src: 'tokens, I>(
+) -> impl Parser<'tokens, I, FieldType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+{
     recursive(|field_type| {
-        let ident = select! { Token::Identifier(name) => name.to_string() };
-        let int_lit = select! { Token::Integer(s) => s.parse::<i64>().unwrap() };
+        let field_type = field_type.labelled("type");
+        let ident = select! { Token::Identifier(name) => name.to_string() }.labelled("identifier");
+        let int_lit =
+            select! { Token::Integer(s) => s.parse::<i64>().unwrap() }.labelled("int literal");
+        let float_lit = select! { Token::Integer(s) | Token::Float(s) => s.parse::<f64>().unwrap()}
+            .labelled("float literal");
+        let string_lit =
+            select! { Token::StringLiteral(s) => s.to_string() }.labelled("string literal");
 
         let default_int = just(Token::Equal).ignore_then(int_lit).or_not();
-        let default_float = just(Token::Equal)
-            .ignore_then(
-                select! { Token::Integer(s) | Token::Float(s) => s.parse::<f64>().unwrap() },
-            )
-            .or_not();
-        let default_string = just(Token::Equal)
-            .ignore_then(select! { Token::StringLiteral(s) => s.to_string() })
-            .or_not();
-        let default_enum = just(Token::Equal).ignore_then(ident).or_not();
+        let default_float = just(Token::Equal).ignore_then(float_lit).or_not();
+        let default_string = just(Token::Equal).ignore_then(string_lit).or_not();
+        let default_enum = just(Token::Equal)
+            .ignore_then(ident)
+            .or_not()
+            .labelled("default enum");
 
         let int_type = select! {
             Token::IntLit { signed, width } => (signed, width)
@@ -155,10 +112,11 @@ fn field_type_parser<'a>(
         .map(|(ctor, def)| ctor(def));
 
         let enum_type = {
-            let id = ident.clone();
-            id.then_ignore(just(Token::LParen))
-                .then(select! { Token::IntLit { signed, width } => (signed, width) })
-                .then_ignore(just(Token::RParen))
+            ident
+                .then(
+                    select! { Token::IntLit { signed, width } => (signed, width) }
+                        .delimited_by(just(Token::LParen), just(Token::RParen)),
+                )
                 .map(|(name, (signed, width))| (name, signed, width))
                 .then(default_enum)
                 .map(|((name, signed, width), default)| FieldType::Enum {
@@ -169,39 +127,45 @@ fn field_type_parser<'a>(
                 })
         };
 
-        let struct_type = ident.clone().map(|name| FieldType::Struct { name });
+        let struct_type = ident.map(|name| FieldType::Struct { name });
 
-        // array types
-        let array_type = just(Token::LBracket)
-            .ignore_then(field_type.clone())
+        let array_type = field_type
+            .clone()
             .then_ignore(just(Token::Semicolon))
             .then(
                 int_lit
                     .map(|v| ArrayLength::Static { value: v as u32 })
-                    .or(ident.clone().map(|f| ArrayLength::Dynamic { field: f })),
+                    .or(ident.map(|f| ArrayLength::Dynamic { field: f })),
             )
-            .then_ignore(just(Token::RBracket))
             .map(|(elem, len)| FieldType::Array {
                 element_type: Box::new(elem),
                 length: len,
-            });
+            })
+            .delimited_by(just(Token::LBracket), just(Token::RBracket));
 
         let match_case = ident
-            .clone()
             .then_ignore(just(Token::FatArrow))
             .then(field_type.clone());
         let match_type = just(Token::Match)
-            .ignore_then(ident.clone())
+            .ignore_then(ident)
             .then_ignore(just(Token::Colon))
-            .then(ident.clone())
-            .then_ignore(just(Token::LBrace))
+            .then(ident)
             .then(
                 match_case
                     .separated_by(just(Token::Comma))
                     .allow_trailing()
-                    .collect::<Vec<_>>(),
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace))
+                    .recover_with(via_parser(nested_delimiters(
+                        Token::LBrace,
+                        Token::RBrace,
+                        [
+                            (Token::LParen, Token::RParen),
+                            (Token::LBracket, Token::RBracket),
+                        ],
+                        |_| Vec::new(),
+                    ))),
             )
-            .then_ignore(just(Token::RBrace))
             .map(|((discriminant, enum_name), cases)| {
                 let mut map = HashMap::new();
                 for (tag, ty) in cases {

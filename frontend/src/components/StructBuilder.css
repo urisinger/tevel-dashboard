@@ -30,8 +30,6 @@
   background-color: var(--bg-secondary-light);
   color: var(--text-primary);
   transition: border-color var(--transition-normal);
-  text-overflow: ellipsis;
-  overflow: hidden;
 }
 
 .field-input.invalid {

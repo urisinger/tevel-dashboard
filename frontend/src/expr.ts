@@ -120,7 +120,7 @@ export class Expr {
           const encoded = new TextEncoder().encode(str);
           return encoded.length * 8;
         } else {
-          return mode === "max" ? Infinity : 1;
+          return mode === "max" ? Infinity : 8;
         }
       }
 
@@ -136,7 +136,7 @@ export class Expr {
           const encoded = new HebrewEncoder().encode(str);
           return encoded.length;
         } else {
-          return mode === "max" ? Infinity : 1;
+          return mode === "max" ? Infinity : 8;
         }
       }
 
@@ -185,7 +185,7 @@ export class Expr {
 
         if (mode === "default") {
           const enumFieldTuple = parentFieldTypes
-            ?.find(([fieldName, _fieldType]) => fieldName === type.discriminant);
+            ?.find(([fieldName, _field]) => fieldName === type.discriminant);
           let defaultEnumVal: string | undefined = undefined;
           if (enumFieldTuple) {
             const [, enumFT] = enumFieldTuple;
@@ -231,16 +231,17 @@ export class Expr {
               case "max":
                 return Infinity;
               case "default":
-                const intFieldTuple = parentFieldTypes
-                  ?.find(([fieldName, _fieldType]) => fieldName === field);
-                if (intFieldTuple) {
-                  const [, intFT] = intFieldTuple;
-                  if (intFT.kind === "Int" && intFT.default !== undefined) {
-                    length = intFT.default;
-                    break;
+                {
+                  const intFieldTuple = parentFieldTypes?.find(([fieldName, _]) => fieldName === field);
+                  if (intFieldTuple) {
+                    const [, intFT] = intFieldTuple;
+                    if (intFT.kind === "Int" && intFT.default !== undefined) {
+                      length = intFT.default;
+                      break;
+                    }
                   }
+                  return 0;
                 }
-                return 0;
               case "min":
                 return 0;
             }
@@ -313,7 +314,7 @@ export class Expr {
       case "Struct": {
         if (typeof val !== "object") return false;
         const structVal = val as ValueMap;
-        let types: [string, FieldType][] = parentFieldTypes ? [...parentFieldTypes] : [];
+        const types: [string, FieldType][] = parentFieldTypes ? [...parentFieldTypes] : [];
         for (const [fieldName, fieldType] of this.get(type.name)!.fields) {
           const fieldVal = structVal[fieldName];
           // append this field's type for children lookups

@@ -1,4 +1,3 @@
-
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -7,11 +6,12 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{SinkExt, StreamExt};
+use parking_lot::RwLock;
 use std::{collections::VecDeque, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
-    sync::{broadcast, mpsc, RwLock},
+    sync::{broadcast, mpsc},
     time::sleep,
 };
 
@@ -69,7 +69,7 @@ pub async fn tcp_task(
                         },
                         Ok(n) => {
                             let data = buf[..n].to_vec().into_boxed_slice();
-                            let mut history = recv_history.write().await;
+                            let mut history = recv_history.write();
                             if history.len() >= 100 {
                                 history.pop_front();
                             }
@@ -95,20 +95,25 @@ pub async fn tcp_task(
 /// HTTP handler for `/ws`—chooses proxy vs. echo mode.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(ApiState { tx_in, tx_out, ws_echo, dev, .. }): State<ApiState>,
+    State(ApiState {
+        tx_in,
+        tx_out,
+        ws_echo,
+        dev,
+        recv_history,
+    }): State<ApiState>,
 ) -> impl IntoResponse {
     let rx_out = tx_out.subscribe();
 
     if dev {
         // broadcast‐style echo
-        ws.on_upgrade(move |socket| handle_echo_socket(socket, ws_echo.clone()))
+        ws.on_upgrade(move |socket| handle_echo_socket(socket, ws_echo.clone(), recv_history))
     } else {
         // original TCP proxy
         ws.on_upgrade(move |socket| handle_socket(socket, tx_in, rx_out))
     }
 }
 
-/// Original proxy: send Binary frames → TCP_IN, and TCP_OUT → Binary frames.
 async fn handle_socket(
     socket: WebSocket,
     tx_in: mpsc::Sender<Box<[u8]>>,
@@ -139,6 +144,7 @@ async fn handle_socket(
 async fn handle_echo_socket(
     socket: WebSocket,
     ws_echo_tx: broadcast::Sender<Message>,
+    recv_history: Arc<RwLock<VecDeque<Box<[u8]>>>>,
 ) {
     let (mut tx, mut rx_ws) = socket.split();
     let mut rx_echo = ws_echo_tx.subscribe();
@@ -147,9 +153,17 @@ async fn handle_echo_socket(
         while let Some(Ok(msg)) = rx_ws.next().await {
             // Broadcast to everyone (including sender)
             let to_send = match msg.clone() {
-                Message::Text(t)   => Message::Text(t),
-                Message::Binary(b) => Message::Binary(b),
-                other              => other,
+                Message::Binary(b) => {
+                    let data = b.to_vec().into_boxed_slice();
+                    let mut history = recv_history.write();
+                    if history.len() >= 100 {
+                        history.pop_front();
+                    }
+                    history.push_back(data);
+                    Message::Binary(b)
+                }
+
+                other => other,
             };
             let _ = ws_echo_tx.send(to_send);
         }

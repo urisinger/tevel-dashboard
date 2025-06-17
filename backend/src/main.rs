@@ -1,9 +1,12 @@
 #[cfg(feature = "api")]
 mod api;
+
+#[cfg(feature = "api")]
+use api::{api_service, ApiOpts};
+
 #[cfg(feature = "static-files")]
 mod static_files;
 
-use api::{api_service, ApiOpts};
 use axum::Router;
 use clap::Parser;
 use std::net::SocketAddr;
@@ -16,6 +19,7 @@ struct Opts {
     #[arg(long, default_value = "0.0.0.0:8080")]
     addr: SocketAddr,
 
+    #[cfg(feature = "api")]
     #[clap(flatten)]
     api_opts: ApiOpts,
 }

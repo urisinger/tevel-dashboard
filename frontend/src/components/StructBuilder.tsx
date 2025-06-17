@@ -269,7 +269,7 @@ export const EnumInput: React.FC<{
 
   const defaultKey = useMemo(() => {
     return expr.defaultValue(type) as string;
-  }, [enumDef, expr, type]);
+  }, [expr, type]);
 
   const [selected, setSelected] = useState<string>(() => {
     if (typeof value === "string" && enumDef?.has(value)) {
@@ -280,13 +280,13 @@ export const EnumInput: React.FC<{
 
   useEffect(() => {
     const isValid = typeof value === "string" && enumDef?.has(value);
-    const newSelected = isValid ? (value as string) : defaultKey;
+    const newSelected = isValid ? (value) : defaultKey;
     setSelected(newSelected);
 
     if (!isValid) {
       onChange(defaultKey);
     }
-  }, [value, defaultKey, enumDef]);
+  }, [value, defaultKey, enumDef, onChange]);
 
 
   if (!enumDef) {

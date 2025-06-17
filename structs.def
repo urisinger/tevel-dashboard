@@ -30,7 +30,7 @@ struct TriangleData {
 }
 
 struct DrawingMetadata {
-  test: i2 = 1,
+  test: i17 = 1,
   language: Language(i8) = Hebrew,
   title: match language: Language{
     English => CString,

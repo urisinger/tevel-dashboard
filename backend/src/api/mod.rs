@@ -10,12 +10,12 @@ use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use base64::{engine::general_purpose::STANDARD as base64_engine, Engine};
 use clap::Parser;
 use notify::Watcher;
+use parking_lot::RwLock;
 use serde_json::Value;
 use tcp_proxy::{tcp_task, ws_handler};
 use tokio::{
     fs,
-    sync::{broadcast, mpsc, RwLock},
-    task::JoinHandle,
+    sync::{broadcast, mpsc},
 };
 
 mod tcp_proxy;
@@ -37,7 +37,6 @@ pub struct ApiOpts {
     #[clap(long, default_value_t = 16)]
     pub out_broadcast_capacity: usize,
 
-    /// Enable WebSocket echo & broadcast mode
     #[clap(long)]
     pub dev: bool,
 
@@ -84,25 +83,26 @@ pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
     let in_addr = opt.in_addr;
     let out_addr = opt.out_addr;
 
-    if !opt.dev{
-    tokio::spawn(tcp_task(
-        in_addr,
-        out_addr,
-        retry_delay,
-        rx_in,
-        tx_out,
-        recv_history,
-    ));}
+    if !opt.dev {
+        tokio::spawn(tcp_task(
+            in_addr,
+            out_addr,
+            retry_delay,
+            rx_in,
+            tx_out,
+            recv_history,
+        ));
+    }
 
     Router::new()
         .route("/ws/", get(ws_handler))
         .route("/history", get(history_handler))
         .route("/structs.json", get(serve_structs_json))
         .with_state(state)
-    }
+}
 
 async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
-    let hist = state.recv_history.read().await;
+    let hist = state.recv_history.read();
     let payloads: Vec<_> = hist
         .iter()
         .map(|msg| {
@@ -117,13 +117,10 @@ async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
 }
 
 async fn serve_structs_json() -> impl IntoResponse {
-    let lock = STRUCTS_JSON.read().await;
+    let lock = STRUCTS_JSON.read();
 
     match &*lock {
         Some(json) => Json(json.clone()).into_response(),
-        #[cfg(feature = "static-files")]
-        None => crate::static_files::StaticFile("structs.json").into_response(),
-        #[cfg(not(feature = "static-files"))]
         None => (
             axum::http::StatusCode::BAD_REQUEST,
             "File missing, try enabling the static-files feature",
@@ -142,9 +139,8 @@ pub async fn load_structs_once(path: &PathBuf) {
     };
 
     let json = match type_expr_compiler::compile(&source) {
-        Ok(j) => j,
-        Err(e) => {
-            eprintln!("Compilation error for `{}`: {}", path.display(), e);
+        Some(j) => j,
+        None => {
             return;
         }
     };
@@ -157,35 +153,44 @@ pub async fn load_structs_once(path: &PathBuf) {
         }
     };
 
-    let mut lock = STRUCTS_JSON.write().await;
+    let mut lock = STRUCTS_JSON.write();
     *lock = Some(parsed);
 }
+
 fn watch_structs_file(def_path: PathBuf) {
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::recommended_watcher(tx).expect("Failed to create watcher");
 
+        let dir = def_path.parent().expect("Cannot watch root directory");
         watcher
-            .watch(&def_path, notify::RecursiveMode::NonRecursive)
-            .expect("Failed to watch .def file");
+            .watch(dir, notify::RecursiveMode::NonRecursive)
+            .expect("Failed to watch .def file parent");
 
         println!("📡 Watching {} for changes...", def_path.display());
 
+        let path_str = def_path.to_str().unwrap();
+
         loop {
             match rx.recv() {
-                Ok(Ok(event)) if event.kind.is_modify() => {
+                Ok(Ok(event))
+                    if event
+                        .paths
+                        .iter()
+                        .any(|p| p.file_name().and_then(|s| s.to_str()) == Some(path_str))
+                        && event.kind.is_modify() =>
+                {
                     println!("🔄 Change detected, recompiling...");
                     if let Ok(source) = std::fs::read_to_string(&def_path) {
-                        match type_expr_compiler::compile(&source) {
-                            Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
+                        if let Some(json_str) = type_expr_compiler::compile(&source) {
+                            match serde_json::from_str::<Value>(&json_str) {
                                 Ok(parsed) => {
-                                    let mut lock = STRUCTS_JSON.blocking_write();
+                                    let mut lock = STRUCTS_JSON.write();
                                     *lock = Some(parsed);
                                     println!("✅ In-memory structs.json updated");
                                 }
                                 Err(e) => eprintln!("❌ Invalid JSON: {e}"),
-                            },
-                            Err(e) => eprintln!("❌ Compile error: {e}"),
+                            }
                         }
                     }
                 }
