@@ -1,154 +1,71 @@
 use std::io::{self, Write};
 
 use codespan_reporting::{
-    diagnostic::Diagnostic,
+    diagnostic::{Diagnostic, LabelStyle, Severity},
     files::Files,
     term::{
-        self,
-        termcolor::{self, Color, ColorSpec, WriteColor},
-        Config,
+        Config, Renderer, RichDiagnostic,
+        termcolor::{self},
     },
 };
 
-pub fn render_diagnostics_doc<'a, F, FileId, W>(
+pub fn render_diagnostics<'a, F, W>(
     out: &mut W,
-    diagnostics: &[Diagnostic<FileId>],
+    diagnostics: &[Diagnostic<F::FileId>],
     files: &'a F,
     config: &Config,
 ) -> io::Result<()>
 where
-    F: Files<'a, FileId = FileId>,
-    FileId: Copy,
+    F: Files<'a>,
     W: Write,
 {
-    // 1) Document prologue
-    write!(
-        out,
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Diagnostics</title>
-</head>
-<body>
-"#
-    )?;
-
-    // 2) Your existing fragment function emits the styled div + <pre>
-    render_diagnostics(out, diagnostics, files, config)?;
-
-    // 3) Close body/html
-    write!(
-        out,
-        r#"
-</body>
-</html>
-"#
-    )?;
-
-    out.flush()
-}
-
-pub fn render_diagnostics<'a, F, FileId, W>(
-    out: &mut W,
-    diagnostics: &[Diagnostic<FileId>],
-    files: &'a F,
-    config: &Config,
-) -> io::Result<()>
-where
-    F: Files<'a, FileId = FileId>,
-    FileId: Copy,
-    W: Write,
-{
-    // 1) Render colored HTML into a buffer
     let mut buf = Vec::new();
     {
         let mut html_writer = HtmlWriter::new(&mut buf);
+
+        let mut renderer = Renderer::new(&mut html_writer, config);
         for diag in diagnostics {
-            term::emit(&mut html_writer, config, files, diag).map_err(io::Error::other)?;
+            RichDiagnostic::new(diag, config)
+                .render(files, &mut renderer)
+                .map_err(io::Error::other)?;
         }
-        html_writer.reset()?;
+        html_writer.close_span()?;
     }
 
-    // 2) Emit just a div with style + pre
-    write!(
-        out,
-        r#"<div class="diagnostics">
-  <style>
-    /* Base16 Tomorrow Night */
-    pre {{
-      background: #1d1f21;
-      margin: 0;
-      padding: 10px;
-      border-radius: 6px;
-      color: #ffffff;
-      font: 12px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }}
-
-    pre .bold {{ font-weight: bold; }}
-
-    /* foreground */
-    pre .fg.black   {{ color: #1d1f21; }}
-    pre .fg.red     {{ color: #cc6666; }}
-    pre .fg.green   {{ color: #b5bd68; }}
-    pre .fg.yellow  {{ color: #f0c674; }}
-    pre .fg.blue    {{ color: #81a2be; }}
-    pre .fg.magenta {{ color: #b294bb; }}
-    pre .fg.cyan    {{ color: #8abeb7; }}
-    pre .fg.white   {{ color: #c5c8c6; }}
-
-    pre .fg.black.bright    {{ color: #969896; }}
-    pre .fg.red.bright      {{ color: #cc6666; }}
-    pre .fg.green.bright    {{ color: #b5bd68; }}
-    pre .fg.yellow.bright   {{ color: #f0c674; }}
-    pre .fg.blue.bright     {{ color: #81a2be; }}
-    pre .fg.magenta.bright  {{ color: #b294bb; }}
-    pre .fg.cyan.bright     {{ color: #8abeb7; }}
-    pre .fg.white.bright    {{ color: #ffffff; }}
-
-    /* background */
-    pre .bg.black   {{ background-color: #1d1f21; }}
-    pre .bg.red     {{ background-color: #cc6666; }}
-    pre .bg.green   {{ background-color: #b5bd68; }}
-    pre .bg.yellow  {{ background-color: #f0c674; }}
-    pre .bg.blue    {{ background-color: #81a2be; }}
-    pre .bg.magenta {{ background-color: #b294bb; }}
-    pre .bg.cyan    {{ background-color: #8abeb7; }}
-    pre .bg.white   {{ background-color: #c5c8c6; }}
-
-    pre .bg.black.bright    {{ background-color: #969896; }}
-    pre .bg.red.bright      {{ background-color: #cc6666; }}
-    pre .bg.green.bright    {{ background-color: #b5bd68; }}
-    pre .bg.yellow.bright   {{ background-color: #f0c674; }}
-    pre .bg.blue.bright     {{ background-color: #81a2be; }}
-    pre .bg.magenta.bright  {{ background-color: #b294bb; }}
-    pre .bg.cyan.bright     {{ background-color: #8abeb7; }}
-    pre .bg.white.bright    {{ background-color: #ffffff; }}
-  </style>
-  <pre>"#
-    )?;
-
-    // 3) Insert the coloured content
     out.write_all(&buf)?;
 
-    // 4) Close the tags
-    write!(out, "</pre>\n</div>\n")?;
     out.flush()
 }
 
 pub struct HtmlWriter<W> {
     upstream: W,
-    color: ColorSpec,
+    span_open: bool,
 }
 
-impl<W> HtmlWriter<W> {
-    pub fn new(upstream: W) -> HtmlWriter<W> {
+impl<W: Write> HtmlWriter<W> {
+    pub fn new(upstream: W) -> Self {
         HtmlWriter {
             upstream,
-            color: ColorSpec::new(),
+            span_open: false,
         }
+    }
+
+    /// Close any open span
+    fn close_span(&mut self) -> io::Result<()> {
+        if self.span_open {
+            write!(self.upstream, "</span>")?;
+            self.span_open = false;
+        }
+        Ok(())
+    }
+
+    /// Open a new span with the given CSS class
+    fn open_span(&mut self, class: &str) -> io::Result<()> {
+        // close existing first
+        self.close_span()?;
+        write!(self.upstream, "<span class=\"{}\">", class)?;
+        self.span_open = true;
+        Ok(())
     }
 }
 
@@ -156,102 +73,56 @@ impl<W: Write> Write for HtmlWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.upstream.write(buf)
     }
-
     fn flush(&mut self) -> io::Result<()> {
         self.upstream.flush()
     }
 }
 
-impl<W: Write> WriteColor for HtmlWriter<W> {
-    fn supports_color(&self) -> bool {
-        true
+impl<W: Write> codespan_reporting::term::WriteStyle for HtmlWriter<W> {
+    fn set_header(&mut self, severity: Severity) -> io::Result<()> {
+        let class = match severity {
+            Severity::Bug => "header-bug",
+            Severity::Error => "header-error",
+            Severity::Warning => "header-warning",
+            Severity::Note => "header-note",
+            Severity::Help => "header-help",
+        };
+        self.open_span(class)
     }
 
-    fn set_color(&mut self, spec: &ColorSpec) -> io::Result<()> {
-        #![allow(unused_assignments)]
+    fn set_header_message(&mut self) -> io::Result<()> {
+        self.open_span("header-message")
+    }
 
-        if self.color == *spec {
-            return Ok(());
-        } else {
-            if !self.color.is_none() {
-                write!(self, "</span>")?;
-            }
-            self.color = spec.clone();
-        }
+    fn set_line_number(&mut self) -> io::Result<()> {
+        self.open_span("line-number")
+    }
 
-        if spec.is_none() {
-            write!(self, "</span>")?;
-            return Ok(());
-        } else {
-            write!(self, "<span class=\"")?;
-        }
+    fn set_note_bullet(&mut self) -> io::Result<()> {
+        self.open_span("note-bullet")
+    }
 
-        let mut first = true;
+    fn set_source_border(&mut self) -> io::Result<()> {
+        self.open_span("source-border")
+    }
 
-        fn write_first<W: Write>(first: bool, writer: &mut HtmlWriter<W>) -> io::Result<bool> {
-            if !first {
-                write!(writer, " ")?;
-            }
-
-            Ok(false)
-        }
-
-        fn write_color<W: Write>(color: &Color, writer: &mut HtmlWriter<W>) -> io::Result<()> {
-            match color {
-                Color::Black => write!(writer, "black"),
-                Color::Blue => write!(writer, "blue"),
-                Color::Green => write!(writer, "green"),
-                Color::Red => write!(writer, "red"),
-                Color::Cyan => write!(writer, "cyan"),
-                Color::Magenta => write!(writer, "magenta"),
-                Color::Yellow => write!(writer, "yellow"),
-                Color::White => write!(writer, "white"),
-                // TODO: other colors
-                _ => Ok(()),
-            }
-        }
-
-        if let Some(fg) = spec.fg() {
-            first = write_first(first, self)?;
-            write!(self, "fg ")?;
-            write_color(fg, self)?;
-        }
-
-        if let Some(bg) = spec.bg() {
-            first = write_first(first, self)?;
-            write!(self, "bg ")?;
-            write_color(bg, self)?;
-        }
-
-        if spec.bold() {
-            first = write_first(first, self)?;
-            write!(self, "bold")?;
-        }
-
-        if spec.underline() {
-            first = write_first(first, self)?;
-            write!(self, "underline")?;
-        }
-
-        if spec.intense() {
-            first = write_first(first, self)?;
-            write!(self, "bright")?;
-        }
-
-        write!(self, "\">")?;
-
-        Ok(())
+    fn set_label(&mut self, severity: Severity, label_style: LabelStyle) -> io::Result<()> {
+        let sev = match severity {
+            Severity::Bug => "bug",
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+            Severity::Note => "note",
+            Severity::Help => "help",
+        };
+        let typ = match label_style {
+            LabelStyle::Primary => "primary",
+            LabelStyle::Secondary => "secondary",
+        };
+        self.open_span(&format!("label-{}-{}", typ, sev))
     }
 
     fn reset(&mut self) -> io::Result<()> {
-        let color = self.color.clone();
-
-        if color != ColorSpec::new() {
-            write!(self, "</span>")?;
-            self.color = ColorSpec::new();
-        }
-
-        Ok(())
+        self.close_span()
     }
 }
 

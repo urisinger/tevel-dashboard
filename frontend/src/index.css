@@ -57,11 +57,7 @@ body {
   color: var(--text-secondary);
 }
 
-.error {
-  font-size: var(--text-lg);
-  color: var(--color-danger);
-  padding: var(--spacing-md);
-}
+
 
 .app-container {
   display: flex;

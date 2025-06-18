@@ -3,12 +3,12 @@ import { Expr, Value } from '../expr';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
 import StructBuilder from '../components/StructBuilder';
 import { ReadyState } from 'react-use-websocket';
+import { useOutletContext } from 'react-router-dom';
 
-interface SendPageProps {
-  expr: Expr;
-}
 
-const SendPage: React.FC<SendPageProps> = ({ expr }) => {
+const SendPage: React.FC = () => {
+  const expr = useOutletContext<Expr>();
+
   const { sendMessage, readyState } = useWebSocketContext();
 
   const handleSubmit = (value: Value) => {

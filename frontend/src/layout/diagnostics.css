@@ -1,0 +1,71 @@
+.diagnostics {
+    background: var(--diagnostics-bg);
+    color: var(--diagnostics-text);
+    margin: 0;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    font: var(--text-sm) SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.diagnostics .bold {
+    font-weight: bold;
+}
+
+.diagnostics .header-bug,
+.diagnostics .header-error {
+    color: var(--diagnostics-error);
+    font-weight: bold;
+}
+
+.diagnostics .header-warning {
+    color: var(--diagnostics-warning);
+    font-weight: bold;
+}
+
+.diagnostics .header-note {
+    color: var(--diagnostics-note);
+    font-weight: bold;
+}
+
+.diagnostics .header-help {
+    color: var(--diagnostics-help);
+    font-weight: bold;
+}
+
+.diagnostics .header-message {
+    color: var(--diagnostics-text);
+    font-weight: bold;
+}
+
+.diagnostics .line-number,
+.diagnostics .source-border,
+.diagnostics .note-bullet {
+    color: var(--diagnostics-primary);
+}
+
+.diagnostics .label-primary-bug,
+.diagnostics .label-primary-error {
+    color: var(--diagnostics-error);
+}
+
+.diagnostics .label-primary-warning {
+    color: var(--diagnostics-warning);
+}
+
+.diagnostics .label-primary-note {
+    color: var(--diagnostics-note);
+}
+
+.diagnostics .label-primary-help {
+    color: var(--diagnostics-help);
+}
+
+.diagnostics .label-secondary-bug,
+.diagnostics .label-secondary-error,
+.diagnostics .label-secondary-warning,
+.diagnostics .label-secondary-note,
+.diagnostics .label-secondary-help {
+    color: var(--diagnostics-primary);
+}

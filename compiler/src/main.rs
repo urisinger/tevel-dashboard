@@ -1,8 +1,8 @@
 use codespan_reporting::term;
+use codespan_reporting::term::Styles;
 use codespan_reporting::term::termcolor::ColorChoice;
 use codespan_reporting::term::termcolor::StandardStream;
 use type_expr_compiler::compile;
-use type_expr_compiler::writer::render_diagnostics_doc;
 
 use std::env;
 use std::fs;
@@ -33,16 +33,15 @@ fn main() {
             let writer = StandardStream::stderr(ColorChoice::Auto);
             let config = term::Config::default();
             for diag in &err.diagnostics {
-                term::emit(&mut writer.lock(), &config, &err.files, diag).unwrap();
+                term::emit(
+                    &mut writer.lock(),
+                    &Styles::default(),
+                    &config,
+                    &err.files,
+                    diag,
+                )
+                .unwrap();
             }
-
-            render_diagnostics_doc(
-                &mut StandardStream::stdout(ColorChoice::Auto).lock(),
-                &err.diagnostics,
-                &err.files,
-                &config,
-            )
-            .unwrap();
         }
     }
 }

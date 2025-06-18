@@ -3,14 +3,15 @@ import { Expr } from "../expr";
 import BufferViewer from "../components/BufferViewer";
 import { useWebSocketContext } from "../contexts/WebSocketContext";
 import { ReadyState } from "react-use-websocket";
+import { useOutletContext } from "react-router-dom";
 
-interface HistoryPageProps {
-  expr: Expr;
-}
 
-const HistoryPage: React.FC<HistoryPageProps> = ({ expr }) => {
+const HistoryPage: React.FC = () => {
+  const expr = useOutletContext<Expr>();
+
   const { getWebSocket, readyState } = useWebSocketContext();
   const [messages, setMessages] = useState<ArrayBuffer[]>([]);
+
 
   useEffect(() => {
     async function loadInitialHistory() {
