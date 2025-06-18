@@ -45,7 +45,7 @@ export const ContentArea: React.FC = () => {
     return <div className="loading">Loading struct definition…</div>;
   }
   if (error) {
-    return <div className="diagnosttic" dangerouslySetInnerHTML={{ __html: error }} />;
+    return <div className="diagnostics" dangerouslySetInnerHTML={{ __html: error }} />;
   }
   if (!expr) {
     return <div className="error">No struct definition available</div>;

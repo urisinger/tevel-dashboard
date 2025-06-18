@@ -14,6 +14,7 @@ use tokio::{
     sync::{broadcast, mpsc},
     time::sleep,
 };
+use tracing::{error, info, warn};
 
 use super::ApiState;
 
@@ -33,19 +34,19 @@ pub async fn tcp_task(
         if tcp_in.is_none() {
             if let Ok(s) = TcpStream::connect(in_addr).await {
                 s.set_nodelay(true).ok();
-                println!("✅ IN connected");
+                info!("IN connected");
                 tcp_in = Some(s);
             } else {
-                println!("⚠️ IN connect failed, retrying...");
+                warn!("IN connect failed, retrying...");
             }
         }
         if tcp_out.is_none() {
             if let Ok(s) = TcpStream::connect(out_addr).await {
                 s.set_nodelay(true).ok();
-                println!("✅ OUT connected");
+                info!("OUT connected");
                 tcp_out = Some(s);
             } else {
-                println!("⚠️ OUT connect failed, retrying...");
+                warn!("OUT connect failed, retrying...");
             }
         }
 
@@ -53,7 +54,7 @@ pub async fn tcp_task(
             // forward from WebSocket → TCP_IN
             Some(data) = rx_in.recv(), if tcp_in.is_some() => {
                 if let Err(e) = tcp_in.as_mut().unwrap().write_all(&data).await {
-                    eprintln!("❌ write to IN failed: {}", e);
+                    error!("write to IN failed: {}", e);
                     tcp_in = None;
                 }
             }

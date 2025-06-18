@@ -71,7 +71,20 @@ impl<W: Write> HtmlWriter<W> {
 
 impl<W: Write> Write for HtmlWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.upstream.write(buf)
+        let mut last = 0;
+        for (i, &b) in buf.iter().enumerate() {
+            let escape = match b {
+                b'<' => b"&lt;"[..].as_ref(),
+                b'>' => b"&gt;"[..].as_ref(),
+                b'&' => b"&amp;"[..].as_ref(),
+                _ => continue,
+            };
+            self.upstream.write_all(&buf[last..i])?;
+            self.upstream.write_all(escape)?;
+            last = i + 1;
+        }
+        self.upstream.write_all(&buf[last..])?;
+        Ok(buf.len())
     }
     fn flush(&mut self) -> io::Result<()> {
         self.upstream.flush()

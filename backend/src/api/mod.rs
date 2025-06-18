@@ -5,6 +5,7 @@ use std::{
     sync::{Arc, LazyLock},
     time::Duration,
 };
+use tracing::{error, info};
 
 use axum::{
     extract::State,
@@ -127,11 +128,7 @@ async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
 async fn serve_structs_json() -> impl IntoResponse {
     match &*STRUCTS_JSON.read() {
         // never loaded
-        None => (
-            StatusCode::BAD_REQUEST,
-            "File missing, try enabling the static-files feature",
-        )
-            .into_response(),
+        None => (StatusCode::BAD_REQUEST, "File missinge").into_response(),
 
         // successfully compiled JSON
         Some(Ok(v)) => (StatusCode::OK, Json(v.clone())).into_response(),
@@ -146,7 +143,6 @@ async fn serve_structs_json() -> impl IntoResponse {
 }
 
 pub async fn load_structs_once(path: &PathBuf) {
-    // 1) Read .def source
     let src = match fs::read_to_string(path).await {
         Ok(s) => s,
         Err(e) => {
@@ -155,26 +151,21 @@ pub async fn load_structs_once(path: &PathBuf) {
         }
     };
 
-    // 2) Attempt compile(filename, src)
     match compile(path.display().to_string(), &src) {
-        // a) Success → parse JSON
         Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
             Ok(parsed) => {
                 let mut lock = STRUCTS_JSON.write();
                 *lock = Some(Ok(parsed));
             }
             Err(e) => {
-                eprintln!("JSON parse error for `{}` output: {}", path.display(), e);
+                error!("JSON parse error for `{}` output: {}", path.display(), e);
             }
         },
 
-        // b) CompileError → render diagnostics to HTML fragment
         Err(err) => {
-            // prepare a buffer and default config
             let config = term::Config::default();
             let mut buf = Vec::new();
 
-            // render_diagnostics writes a full <div>… with styles + <pre>
             render_diagnostics(&mut buf, &err.diagnostics, &err.files, &config)
                 .expect("render_diagnostics failed");
 
@@ -192,11 +183,12 @@ fn watch_structs_file(def_path: PathBuf) {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::recommended_watcher(tx).expect("Failed to create watcher");
         let dir = def_path.parent().expect("Cannot watch root directory");
+        println!("{dir:?}");
         watcher
             .watch(dir, notify::RecursiveMode::NonRecursive)
             .expect("Failed to watch .def file parent");
 
-        println!("📡 Watching {} for changes...", def_path.display());
+        info!("Watching {} for changes...", def_path.display());
         let filename = def_path.display().to_string();
 
         for event in rx.iter().flatten() {
@@ -209,28 +201,25 @@ fn watch_structs_file(def_path: PathBuf) {
                 continue;
             }
 
-            println!("🔄 Change detected, recompiling…");
+            info!("Change detected, recompiling…");
 
-            // 1) Sync-read the file
             let src = match std::fs::read_to_string(&def_path) {
                 Ok(s) => s,
                 Err(e) => {
-                    eprintln!("Error reading `{}`: {}", def_path.display(), e);
+                    error!("Error reading `{}`: {}", def_path.display(), e);
                     continue;
                 }
             };
 
-            // 2) compile or render diagnostics
             let result: Result<Value, String> = match compile(&filename, &src) {
                 Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
                     Ok(val) => Ok(val),
                     Err(e) => {
-                        eprintln!("JSON parse error: {}", e);
+                        error!("JSON parse error: {}", e);
                         continue;
                     }
                 },
                 Err(err) => {
-                    // render diagnostics
                     let config = term::Config::default();
                     let mut buf = Vec::new();
                     render_diagnostics(&mut buf, &err.diagnostics, &err.files, &config)
@@ -241,12 +230,11 @@ fn watch_structs_file(def_path: PathBuf) {
                 }
             };
 
-            // 3) Store into the async RwLock via a small runtime
             let lock = STRUCTS_JSON.clone();
             let mut guard = lock.write();
             *guard = Some(result);
             if guard.as_ref().unwrap().is_ok() {
-                println!("✅ In-memory structs.json updated");
+                info!("In-memory structs.json updated");
             }
         }
     });

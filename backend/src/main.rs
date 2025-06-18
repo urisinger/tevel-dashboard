@@ -11,7 +11,8 @@ use axum::Router;
 use clap::Parser;
 use std::net::SocketAddr;
 use tower_http::trace::TraceLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::info;
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
 #[command(name = "proxy-server")]
@@ -28,6 +29,7 @@ struct Opts {
 async fn main() {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
+        .with(LevelFilter::INFO)
         .init();
 
     let args = Opts::parse();
@@ -49,7 +51,7 @@ async fn main() {
 
     let app = app.layer(TraceLayer::new_for_http());
 
-    println!("🚀 Serving on http://{}", args.addr);
+    info!("Serving on http://{}", args.addr);
     axum::serve(
         tokio::net::TcpListener::bind(args.addr).await.unwrap(),
         app.into_make_service(),
