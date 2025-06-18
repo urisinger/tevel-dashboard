@@ -58,13 +58,8 @@ body {
 }
 
 .error {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
   font-size: var(--text-lg);
   color: var(--color-danger);
-  text-align: center;
   padding: var(--spacing-md);
 }
 

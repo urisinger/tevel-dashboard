@@ -1,29 +1,122 @@
-use chumsky::{input::ValueInput, prelude::*};
 use std::collections::HashMap;
 
+use chumsky::{input::ValueInput, prelude::*};
+
 use crate::{
-    definition::{ArrayLength, Definition, FieldType},
-    lexer::{Span, Token},
+    definition::ArrayLength,
+    lexer::{Span, Spanned, Token},
 };
 
-pub fn parser<'tokens, 'src: 'tokens, I>(
-) -> impl Parser<'tokens, I, Vec<Definition>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+pub enum DefinitionAST {
+    Struct {
+        name: Spanned<String>,
+        #[allow(clippy::type_complexity)]
+        fields: Spanned<Vec<Spanned<(Spanned<String>, Spanned<FieldAST>)>>>,
+    },
+    Enum {
+        name: Spanned<String>,
+        #[allow(clippy::type_complexity)]
+        entries: Spanned<Vec<Spanned<(Spanned<String>, Spanned<i64>)>>>,
+    },
+}
+
+impl DefinitionAST {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Enum { name, .. } | Self::Struct { name, .. } => &name.0,
+        }
+    }
+
+    pub fn name_span(&self) -> Span {
+        match self {
+            Self::Enum { name, .. } | Self::Struct { name, .. } => name.1,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum FieldAST {
+    Struct {
+        name: Spanned<String>,
+    },
+    Array {
+        element_type: Box<Spanned<FieldAST>>,
+        length: Spanned<ArrayLength>,
+    },
+    Match {
+        discriminant: Spanned<String>,
+        #[allow(clippy::type_complexity)]
+        cases: Spanned<Vec<Spanned<(Spanned<String>, Spanned<FieldAST>)>>>,
+    },
+    Enum {
+        name: Spanned<String>,
+        int_span: Span,
+        signed: bool,
+        width: u8,
+        default: Option<Spanned<String>>,
+    },
+    Int {
+        span: Span,
+        signed: bool,
+        width: u8,
+        default: Option<Spanned<i64>>,
+    },
+    F32 {
+        default: Option<Spanned<f64>>,
+    },
+    F64 {
+        default: Option<Spanned<f64>>,
+    },
+    CString {
+        default: Option<Spanned<String>>,
+    },
+    HebrewString {
+        default: Option<Spanned<String>>,
+    },
+}
+
+pub fn parser<'tokens, 'src: 'tokens, I>() -> impl Parser<
+    'tokens,
+    I,
+    HashMap<String, DefinitionAST>,
+    extra::Err<Rich<'tokens, Token<'src>, Span>>,
+> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
-    let ident = select! { Token::Identifier(name) => name.to_string() }.labelled("identifier");
-    let int_lit =
-        select! { Token::Integer(num) => num.parse::<i64>().unwrap() }.labelled("integer literal");
+    let ident = select! { Token::Identifier(name) => name.to_string() }
+        .map_with(|ident, e| (ident, e.span()))
+        .labelled("identifier");
+    let int_lit = select! { Token::Integer(num) => num.parse::<i64>().unwrap() }
+        .map_with(|ident, e| (ident, e.span()))
+        .labelled("integer literal");
 
-    let field_type = type_parser().labelled("type");
+    let field_type = type_parser()
+        .labelled("type")
+        .map_with(|field, e| (field, e.span()));
 
-    let field = ident.then_ignore(just(Token::Colon)).then(field_type);
+    let field = ident
+        .then_ignore(just(Token::Colon))
+        .then(field_type)
+        .map_with(|field, e| (field, e.span()));
 
-    let struct_body = field
+    let main_body = field
         .separated_by(just(Token::Comma))
         .allow_trailing()
         .collect::<Vec<_>>()
-        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .map_with(|fields, e| (fields, e.span()));
+
+    let closing_brace = choice((
+        just(Token::RBrace).to(true),
+        one_of([Token::Enum, Token::Struct]).rewind().to(false),
+        end().to(false),
+    ));
+
+    let main_body_closed = main_body.then(closing_brace);
+
+    let struct_body = just(Token::LBrace)
+        .ignore_then(main_body_closed.clone())
+        .recover_with(via_parser(main_body_closed))
         .recover_with(via_parser(nested_delimiters(
             Token::LBrace,
             Token::RBrace,
@@ -31,21 +124,32 @@ where
                 (Token::LParen, Token::RParen),
                 (Token::LBracket, Token::RBracket),
             ],
-            |_| Vec::new(),
+            |span| ((Vec::new(), span), true),
         )));
 
     let struct_def = just(Token::Struct)
         .ignore_then(ident)
         .then(struct_body)
-        .map(|(name, fields)| Definition::Struct { name, fields });
+        .boxed()
+        .validate(|(name, (fields, saw_close)), e, emitter| {
+            if !saw_close {
+                emitter.emit(Rich::custom(e.span(), "unclosed struct body"));
+            }
+            (name, fields)
+        })
+        .map(|(name, fields)| (name.0.clone(), DefinitionAST::Struct { name, fields }));
 
-    let enum_entry = ident.then_ignore(just(Token::Equal)).then(int_lit);
+    let enum_entry = ident
+        .then_ignore(just(Token::Equal))
+        .then(int_lit)
+        .map_with(|ident, e| (ident, e.span()));
 
     let enum_body = enum_entry
         .separated_by(just(Token::Comma))
         .allow_trailing()
         .collect::<Vec<_>>()
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .boxed()
         .recover_with(via_parser(nested_delimiters(
             Token::LBrace,
             Token::RBrace,
@@ -54,30 +158,43 @@ where
                 (Token::LBracket, Token::RBracket),
             ],
             |_| Vec::new(),
-        )));
+        )))
+        .map_with(|ident, e| (ident, e.span()));
 
     let enum_def = just(Token::Enum)
         .ignore_then(ident)
+        .boxed()
         .then(enum_body)
-        .map(|(name, entries)| Definition::Enum { name, entries });
+        .map(|(name, entries)| (name.0.clone(), DefinitionAST::Enum { name, entries }));
 
-    struct_def.or(enum_def).repeated().collect::<Vec<_>>()
+    struct_def
+        .or(enum_def)
+        .boxed()
+        .repeated()
+        .collect::<HashMap<_, _>>()
 }
 
 fn type_parser<'tokens, 'src: 'tokens, I>(
-) -> impl Parser<'tokens, I, FieldType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+) -> impl Parser<'tokens, I, FieldAST, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
     recursive(|field_type| {
-        let field_type = field_type.labelled("type");
-        let ident = select! { Token::Identifier(name) => name.to_string() }.labelled("identifier");
-        let int_lit =
-            select! { Token::Integer(s) => s.parse::<i64>().unwrap() }.labelled("int literal");
+        let field_type = field_type
+            .map_with(|int, e| (int, e.span()))
+            .labelled("type");
+        let ident = select! { Token::Identifier(name) => name.to_string() }
+            .map_with(|int, e| (int, e.span()))
+            .labelled("identifier");
+        let int_lit = select! { Token::Integer(s) => s.parse::<i64>().unwrap() }
+            .map_with(|int, e| (int, e.span()))
+            .labelled("int literal");
         let float_lit = select! { Token::Integer(s) | Token::Float(s) => s.parse::<f64>().unwrap()}
+            .map_with(|int, e| (int, e.span()))
             .labelled("float literal");
-        let string_lit =
-            select! { Token::StringLiteral(s) => s.to_string() }.labelled("string literal");
+        let string_lit = select! { Token::StringLiteral(s) => s.to_string() }
+            .map_with(|int, e| (int, e.span()))
+            .labelled("string literal");
 
         let default_int = just(Token::Equal).ignore_then(int_lit).or_not();
         let default_float = just(Token::Equal).ignore_then(float_lit).or_not();
@@ -90,23 +207,25 @@ where
         let int_type = select! {
             Token::IntLit { signed, width } => (signed, width)
         }
+        .map_with(|int, e| (int, e.span()))
         .then(default_int)
-        .map(|((signed, width), default)| FieldType::Int {
+        .map(|(((signed, width), span), default)| FieldAST::Int {
             signed,
+            span,
             width,
             default,
         });
 
         let float_type = select! {
-            Token::F32 => (|d| FieldType::F32 { default: d.map(|f| f as f32) }) as fn(Option<f64>) -> FieldType,
-            Token::F64 => |d| FieldType::F64 { default: d },
+            Token::F32 => (|d| FieldAST::F32 { default: d }) as fn(_) -> _,
+            Token::F64 => |d| FieldAST::F64 { default: d },
         }
         .then(default_float)
         .map(|(ctor, def)| ctor(def));
 
         let string_type = select! {
-            Token::CString => (|d| FieldType::CString { default: d })  as fn(Option<String>) -> FieldType,
-            Token::HebrewString => |d| FieldType::HebrewString { default: d },
+            Token::CString => (|d| FieldAST::CString { default: d })  as fn(_) -> _,
+            Token::HebrewString => |d| FieldAST::HebrewString { default: d },
         }
         .then(default_string)
         .map(|(ctor, def)| ctor(def));
@@ -115,41 +234,46 @@ where
             ident
                 .then(
                     select! { Token::IntLit { signed, width } => (signed, width) }
-                        .delimited_by(just(Token::LParen), just(Token::RParen)),
+                        .delimited_by(just(Token::LParen), just(Token::RParen))
+                        .map_with(|int, e| (int, e.span())),
                 )
-                .map(|(name, (signed, width))| (name, signed, width))
                 .then(default_enum)
-                .map(|((name, signed, width), default)| FieldType::Enum {
-                    name,
-                    signed,
-                    width,
-                    default,
-                })
+                .boxed()
+                .map(
+                    |((name, ((signed, width), int_span)), default)| FieldAST::Enum {
+                        name,
+                        signed,
+                        width,
+                        int_span,
+                        default,
+                    },
+                )
         };
 
-        let struct_type = ident.map(|name| FieldType::Struct { name });
+        let struct_type = ident.map(|name| FieldAST::Struct { name });
 
         let array_type = field_type
             .clone()
             .then_ignore(just(Token::Semicolon))
             .then(
                 int_lit
-                    .map(|v| ArrayLength::Static { value: v as u32 })
-                    .or(ident.map(|f| ArrayLength::Dynamic { field: f })),
+                    .map(|v| ArrayLength::Static { value: v.0 as u32 })
+                    .or(ident.map(|f| ArrayLength::Dynamic { field: f.0 }))
+                    .map_with(|len, e| (len, e.span())),
             )
-            .map(|(elem, len)| FieldType::Array {
+            .map(|(elem, len)| FieldAST::Array {
                 element_type: Box::new(elem),
                 length: len,
             })
+            .boxed()
             .delimited_by(just(Token::LBracket), just(Token::RBracket));
 
         let match_case = ident
             .then_ignore(just(Token::FatArrow))
-            .then(field_type.clone());
+            .then(field_type.clone())
+            .map_with(|cases, e| (cases, e.span()));
         let match_type = just(Token::Match)
             .ignore_then(ident)
-            .then_ignore(just(Token::Colon))
-            .then(ident)
             .then(
                 match_case
                     .separated_by(just(Token::Comma))
@@ -164,18 +288,13 @@ where
                             (Token::LBracket, Token::RBracket),
                         ],
                         |_| Vec::new(),
-                    ))),
+                    )))
+                    .boxed()
+                    .map_with(|cases, e| (cases, e.span())),
             )
-            .map(|((discriminant, enum_name), cases)| {
-                let mut map = HashMap::new();
-                for (tag, ty) in cases {
-                    map.insert(tag, ty);
-                }
-                FieldType::Match {
-                    discriminant,
-                    enum_type_name: enum_name,
-                    cases: map,
-                }
+            .map(|(discriminant, cases)| FieldAST::Match {
+                discriminant,
+                cases,
             });
 
         choice((

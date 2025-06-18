@@ -6,9 +6,16 @@ use std::{
     time::Duration,
 };
 
-use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{Html, IntoResponse},
+    routing::get,
+    Json, Router,
+};
 use base64::{engine::general_purpose::STANDARD as base64_engine, Engine};
 use clap::Parser;
+use codespan_reporting::term;
 use notify::Watcher;
 use parking_lot::RwLock;
 use serde_json::Value;
@@ -17,6 +24,7 @@ use tokio::{
     fs,
     sync::{broadcast, mpsc},
 };
+use type_expr_compiler::{compile, writer::render_diagnostics};
 
 mod tcp_proxy;
 
@@ -53,7 +61,7 @@ struct ApiState {
     dev: bool,
 }
 
-static STRUCTS_JSON: LazyLock<Arc<RwLock<Option<Value>>>> =
+static STRUCTS_JSON: LazyLock<Arc<RwLock<Option<Result<Value, String>>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(None)));
 
 pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
@@ -117,20 +125,29 @@ async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
 }
 
 async fn serve_structs_json() -> impl IntoResponse {
-    let lock = STRUCTS_JSON.read();
-
-    match &*lock {
-        Some(json) => Json(json.clone()).into_response(),
+    match &*STRUCTS_JSON.read() {
+        // never loaded
         None => (
-            axum::http::StatusCode::BAD_REQUEST,
+            StatusCode::BAD_REQUEST,
             "File missing, try enabling the static-files feature",
+        )
+            .into_response(),
+
+        // successfully compiled JSON
+        Some(Ok(v)) => (StatusCode::OK, Json(v.clone())).into_response(),
+
+        // compile error: send back your HTML fragment with a 422 status
+        Some(Err(html_fragment)) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Html(html_fragment.clone()),
         )
             .into_response(),
     }
 }
 
 pub async fn load_structs_once(path: &PathBuf) {
-    let source = match fs::read_to_string(path).await {
+    // 1) Read .def source
+    let src = match fs::read_to_string(path).await {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Error reading `{}`: {}", path.display(), e);
@@ -138,64 +155,98 @@ pub async fn load_structs_once(path: &PathBuf) {
         }
     };
 
-    let json = match type_expr_compiler::compile(&source) {
-        Some(j) => j,
-        None => {
-            return;
-        }
-    };
+    // 2) Attempt compile(filename, src)
+    match compile(path.display().to_string(), &src) {
+        // a) Success → parse JSON
+        Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
+            Ok(parsed) => {
+                let mut lock = STRUCTS_JSON.write();
+                *lock = Some(Ok(parsed));
+            }
+            Err(e) => {
+                eprintln!("JSON parse error for `{}` output: {}", path.display(), e);
+            }
+        },
 
-    let parsed: Value = match serde_json::from_str(&json) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("JSON parse error for `{}` output: {}", path.display(), e);
-            return;
-        }
-    };
+        // b) CompileError → render diagnostics to HTML fragment
+        Err(err) => {
+            // prepare a buffer and default config
+            let config = term::Config::default();
+            let mut buf = Vec::new();
 
-    let mut lock = STRUCTS_JSON.write();
-    *lock = Some(parsed);
+            // render_diagnostics writes a full <div>… with styles + <pre>
+            render_diagnostics(&mut buf, &err.diagnostics, &err.files, &config)
+                .expect("render_diagnostics failed");
+
+            let html_fragment = String::from_utf8(buf)
+                .unwrap_or_else(|_| "<div>Internal render error</div>".to_string());
+
+            let mut lock = STRUCTS_JSON.write();
+            *lock = Some(Err(html_fragment));
+        }
+    }
 }
 
 fn watch_structs_file(def_path: PathBuf) {
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::recommended_watcher(tx).expect("Failed to create watcher");
-
         let dir = def_path.parent().expect("Cannot watch root directory");
         watcher
             .watch(dir, notify::RecursiveMode::NonRecursive)
             .expect("Failed to watch .def file parent");
 
         println!("📡 Watching {} for changes...", def_path.display());
+        let filename = def_path.display().to_string();
 
-        let path_str = def_path.to_str().unwrap();
+        for event in rx.iter().flatten() {
+            if !(event
+                .paths
+                .iter()
+                .any(|p| p.file_name().and_then(|s| s.to_str()) == Some(&filename))
+                && event.kind.is_modify())
+            {
+                continue;
+            }
 
-        loop {
-            match rx.recv() {
-                Ok(Ok(event))
-                    if event
-                        .paths
-                        .iter()
-                        .any(|p| p.file_name().and_then(|s| s.to_str()) == Some(path_str))
-                        && event.kind.is_modify() =>
-                {
-                    println!("🔄 Change detected, recompiling...");
-                    if let Ok(source) = std::fs::read_to_string(&def_path) {
-                        if let Some(json_str) = type_expr_compiler::compile(&source) {
-                            match serde_json::from_str::<Value>(&json_str) {
-                                Ok(parsed) => {
-                                    let mut lock = STRUCTS_JSON.write();
-                                    *lock = Some(parsed);
-                                    println!("✅ In-memory structs.json updated");
-                                }
-                                Err(e) => eprintln!("❌ Invalid JSON: {e}"),
-                            }
-                        }
-                    }
+            println!("🔄 Change detected, recompiling…");
+
+            // 1) Sync-read the file
+            let src = match std::fs::read_to_string(&def_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error reading `{}`: {}", def_path.display(), e);
+                    continue;
                 }
-                Ok(_) => {}
-                Err(e) => eprintln!("watch error: {:?}", e),
+            };
+
+            // 2) compile or render diagnostics
+            let result: Result<Value, String> = match compile(&filename, &src) {
+                Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
+                    Ok(val) => Ok(val),
+                    Err(e) => {
+                        eprintln!("JSON parse error: {}", e);
+                        continue;
+                    }
+                },
+                Err(err) => {
+                    // render diagnostics
+                    let config = term::Config::default();
+                    let mut buf = Vec::new();
+                    render_diagnostics(&mut buf, &err.diagnostics, &err.files, &config)
+                        .expect("render_diagnostics failed");
+                    let html = String::from_utf8(buf)
+                        .unwrap_or_else(|_| "<div>Internal render error</div>".to_string());
+                    Err(html)
+                }
+            };
+
+            // 3) Store into the async RwLock via a small runtime
+            let lock = STRUCTS_JSON.clone();
+            let mut guard = lock.write();
+            *guard = Some(result);
+            if guard.as_ref().unwrap().is_ok() {
+                println!("✅ In-memory structs.json updated");
             }
         }
     });

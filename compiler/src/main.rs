@@ -1,4 +1,8 @@
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::ColorChoice;
+use codespan_reporting::term::termcolor::StandardStream;
 use type_expr_compiler::compile;
+use type_expr_compiler::writer::render_diagnostics_doc;
 
 use std::env;
 use std::fs;
@@ -10,16 +14,35 @@ fn main() {
         std::process::exit(1);
     }
 
+    let input_path = &args[1];
     let source = fs::read_to_string(&args[1]).unwrap_or_else(|e| {
         eprintln!("Failed to read file: {}", e);
         std::process::exit(1);
     });
 
-    if let Some(json) = compile(&source) {
-        let output_path = std::path::Path::new(&args[1]).with_extension("json");
-        fs::write(&output_path, json).unwrap_or_else(|e| {
-            eprintln!("Failed to write output file: {}", e);
-            std::process::exit(1);
-        });
+    match compile(input_path, &source) {
+        Ok(json) => {
+            let output_path = std::path::Path::new(&args[1]).with_extension("json");
+            fs::write(&output_path, json).unwrap_or_else(|e| {
+                eprintln!("Failed to write output file: {}", e);
+                std::process::exit(1);
+            });
+        }
+
+        Err(err) => {
+            let writer = StandardStream::stderr(ColorChoice::Auto);
+            let config = term::Config::default();
+            for diag in &err.diagnostics {
+                term::emit(&mut writer.lock(), &config, &err.files, diag).unwrap();
+            }
+
+            render_diagnostics_doc(
+                &mut StandardStream::stdout(ColorChoice::Auto).lock(),
+                &err.diagnostics,
+                &err.files,
+                &config,
+            )
+            .unwrap();
+        }
     }
 }

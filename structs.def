@@ -32,20 +32,21 @@ struct TriangleData {
 struct DrawingMetadata {
   test: i17 = 1,
   language: Language(i8) = Hebrew,
-  title: match language: Language{
+  title: match language {
     English => CString,
     Hebrew => HebrewString,
   },
   tagsCount: i8,
-  tags: [match language: language{
+  tags: [match language {
     English => CString,
-    Hebrew => HebrewString,}
+    Hebrew => HebrewString,
+  }
   ; tagsCount] // dynamic array
 }
 
 struct Shape {
   kind: ShapeType(i8),
-  data: match kind: ShapeType {
+  data: match kind {
     Circle => CircleData,
     Rectangle => RectangleData,
     Triangle => TriangleData

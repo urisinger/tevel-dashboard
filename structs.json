@@ -1,228 +1,5 @@
 [
   {
-    "type": "Enum",
-    "name": "ShapeType",
-    "entries": [
-      [
-        "Circle",
-        0
-      ],
-      [
-        "Rectangle",
-        1
-      ],
-      [
-        "Triangle",
-        2
-      ]
-    ]
-  },
-  {
-    "type": "Enum",
-    "name": "Language",
-    "entries": [
-      [
-        "English",
-        0
-      ],
-      [
-        "Hebrew",
-        1
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "Point",
-    "fields": [
-      [
-        "x",
-        {
-          "kind": "f32"
-        }
-      ],
-      [
-        "y",
-        {
-          "kind": "f32"
-        }
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "CircleData",
-    "fields": [
-      [
-        "radius",
-        {
-          "kind": "f32"
-        }
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "RectangleData",
-    "fields": [
-      [
-        "width",
-        {
-          "kind": "f32"
-        }
-      ],
-      [
-        "height",
-        {
-          "kind": "f32"
-        }
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "TriangleData",
-    "fields": [
-      [
-        "a",
-        {
-          "kind": "Struct",
-          "name": "Point"
-        }
-      ],
-      [
-        "b",
-        {
-          "kind": "Struct",
-          "name": "Point"
-        }
-      ],
-      [
-        "c",
-        {
-          "kind": "Struct",
-          "name": "Point"
-        }
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "DrawingMetadata",
-    "fields": [
-      [
-        "test",
-        {
-          "kind": "Int",
-          "signed": true,
-          "width": 2,
-          "default": 1
-        }
-      ],
-      [
-        "language",
-        {
-          "kind": "Enum",
-          "name": "Language",
-          "signed": true,
-          "width": 8,
-          "default": "Hebrew"
-        }
-      ],
-      [
-        "title",
-        {
-          "kind": "Match",
-          "discriminant": "language",
-          "enumTypeName": "Language",
-          "cases": {
-            "English": {
-              "kind": "CString"
-            },
-            "Hebrew": {
-              "kind": "HebrewString"
-            }
-          }
-        }
-      ],
-      [
-        "tagsCount",
-        {
-          "kind": "Int",
-          "signed": true,
-          "width": 8
-        }
-      ],
-      [
-        "tags",
-        {
-          "kind": "Array",
-          "elementType": {
-            "kind": "Match",
-            "discriminant": "language",
-            "enumTypeName": "language",
-            "cases": {
-              "Hebrew": {
-                "kind": "HebrewString"
-              },
-              "English": {
-                "kind": "CString"
-              }
-            }
-          },
-          "length": {
-            "kind": "Dynamic",
-            "field": "tagsCount"
-          }
-        }
-      ]
-    ]
-  },
-  {
-    "type": "Struct",
-    "name": "Shape",
-    "fields": [
-      [
-        "kind",
-        {
-          "kind": "Enum",
-          "name": "ShapeType",
-          "signed": true,
-          "width": 8
-        }
-      ],
-      [
-        "data",
-        {
-          "kind": "Match",
-          "discriminant": "kind",
-          "enumTypeName": "ShapeType",
-          "cases": {
-            "Triangle": {
-              "kind": "Struct",
-              "name": "TriangleData"
-            },
-            "Rectangle": {
-              "kind": "Struct",
-              "name": "RectangleData"
-            },
-            "Circle": {
-              "kind": "Struct",
-              "name": "CircleData"
-            }
-          }
-        }
-      ],
-      [
-        "position",
-        {
-          "kind": "Struct",
-          "name": "Point"
-        }
-      ]
-    ]
-  },
-  {
     "type": "Struct",
     "name": "Main",
     "fields": [
@@ -273,6 +50,229 @@
         "caption",
         {
           "kind": "HebrewString"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "Point",
+    "fields": [
+      [
+        "x",
+        {
+          "kind": "f32"
+        }
+      ],
+      [
+        "y",
+        {
+          "kind": "f32"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Enum",
+    "name": "ShapeType",
+    "entries": [
+      [
+        "Circle",
+        0
+      ],
+      [
+        "Rectangle",
+        1
+      ],
+      [
+        "Triangle",
+        2
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "TriangleData",
+    "fields": [
+      [
+        "a",
+        {
+          "kind": "Struct",
+          "name": "Point"
+        }
+      ],
+      [
+        "b",
+        {
+          "kind": "Struct",
+          "name": "Point"
+        }
+      ],
+      [
+        "c",
+        {
+          "kind": "Struct",
+          "name": "Point"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "Shape",
+    "fields": [
+      [
+        "kind",
+        {
+          "kind": "Enum",
+          "name": "ShapeType",
+          "signed": true,
+          "width": 8
+        }
+      ],
+      [
+        "data",
+        {
+          "kind": "Match",
+          "discriminant": "kind",
+          "enumTypeName": "ShapeType",
+          "cases": {
+            "Triangle": {
+              "kind": "Struct",
+              "name": "TriangleData"
+            },
+            "Rectangle": {
+              "kind": "Struct",
+              "name": "RectangleData"
+            },
+            "Circle": {
+              "kind": "Struct",
+              "name": "CircleData"
+            }
+          }
+        }
+      ],
+      [
+        "position",
+        {
+          "kind": "Struct",
+          "name": "Point"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Enum",
+    "name": "Language",
+    "entries": [
+      [
+        "English",
+        0
+      ],
+      [
+        "Hebrew",
+        1
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "CircleData",
+    "fields": [
+      [
+        "radius",
+        {
+          "kind": "f32"
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "DrawingMetadata",
+    "fields": [
+      [
+        "test",
+        {
+          "kind": "Int",
+          "signed": true,
+          "width": 17,
+          "default": 1
+        }
+      ],
+      [
+        "language",
+        {
+          "kind": "Enum",
+          "name": "Language",
+          "signed": true,
+          "width": 8,
+          "default": "Hebrew"
+        }
+      ],
+      [
+        "title",
+        {
+          "kind": "Match",
+          "discriminant": "language",
+          "enumTypeName": "Language",
+          "cases": {
+            "Hebrew": {
+              "kind": "HebrewString"
+            },
+            "English": {
+              "kind": "CString"
+            }
+          }
+        }
+      ],
+      [
+        "tagsCount",
+        {
+          "kind": "Int",
+          "signed": true,
+          "width": 8
+        }
+      ],
+      [
+        "tags",
+        {
+          "kind": "Array",
+          "elementType": {
+            "kind": "Match",
+            "discriminant": "language",
+            "enumTypeName": "Language",
+            "cases": {
+              "Hebrew": {
+                "kind": "HebrewString"
+              },
+              "English": {
+                "kind": "CString"
+              }
+            }
+          },
+          "length": {
+            "kind": "Dynamic",
+            "field": "tagsCount"
+          }
+        }
+      ]
+    ]
+  },
+  {
+    "type": "Struct",
+    "name": "RectangleData",
+    "fields": [
+      [
+        "width",
+        {
+          "kind": "f32"
+        }
+      ],
+      [
+        "height",
+        {
+          "kind": "f32"
         }
       ]
     ]

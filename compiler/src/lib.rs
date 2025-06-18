@@ -1,15 +1,27 @@
+pub mod checks;
 pub mod definition;
 pub mod lexer;
 pub mod parser;
+pub mod writer;
 
-use ariadne::{sources, Color, Config, IndexType, Label, Report, ReportKind};
+use checks::{check_definitions, check_recursion};
 use chumsky::{input::Input, Parser};
-use lexer::Lexer;
+use lexer::{Lexer, Span};
 
-pub fn compile(src: &str) -> Option<String> {
+use codespan_reporting::{
+    diagnostic::{Diagnostic, Label},
+    files::SimpleFiles,
+};
+
+pub type FileId = usize;
+pub struct CompileError {
+    pub files: SimpleFiles<String, String>,
+    pub diagnostics: Vec<Diagnostic<FileId>>,
+}
+
+pub fn compile(filename: impl Into<String>, src: &str) -> Result<String, CompileError> {
     let mut lexer = Lexer::new(src);
     let tokens = lexer.tokenize();
-
     let parser = parser::parser();
 
     match parser
@@ -20,31 +32,66 @@ pub fn compile(src: &str) -> Option<String> {
         )
         .into_result()
     {
-        Ok(ast) => Some(serde_json::to_string_pretty(&ast).expect("Serialization error")),
-        Err(errs) => {
-            let filename = "<input>".to_string();
-            for e in errs.into_iter().map(|e| e.map_token(|t| t.to_string())) {
-                let span = e.span().into_range();
-                let mut rep = Report::build(ReportKind::Error, (filename.clone(), span.clone()))
-                    .with_config(Config::new().with_index_type(IndexType::Byte))
-                    .with_message(e.to_string())
-                    .with_label(
-                        Label::new((filename.clone(), span))
-                            .with_message(e.reason().to_string())
-                            .with_color(Color::Red),
-                    );
-                for (ctx_msg, ctx_span) in e.contexts() {
-                    rep = rep.with_label(
-                        Label::new((filename.clone(), ctx_span.into_range()))
-                            .with_message(ctx_msg)
-                            .with_color(Color::Yellow),
-                    );
-                }
-                rep.finish()
-                    .print(sources([(filename.clone(), src.to_string())]))
-                    .unwrap();
+        Ok(ast) => {
+            let mut errs = Vec::new();
+
+            check_recursion(&ast, |msg, name_span| errs.push((msg, name_span, vec![])));
+            check_definitions(&ast, |msg, span, name_span| {
+                errs.push((
+                    msg.to_string(),
+                    span,
+                    vec![("In this struct".into(), name_span)],
+                ));
+            });
+
+            if errs.is_empty() {
+                Ok(serde_json::to_string_pretty(&definition::build_all(&ast)).unwrap())
+            } else {
+                Err(make_compile_error(filename, src, errs))
             }
-            None
+        }
+        Err(parse_errs) => {
+            let errs = parse_errs.into_iter().map(|e| {
+                let primary = e.span();
+                let mut secondary = Vec::new();
+                for (msg, ctx_span) in e.contexts() {
+                    secondary.push((msg.to_string(), *ctx_span));
+                }
+                (e.to_string(), *primary, secondary)
+            });
+            Err(make_compile_error(filename, src, errs))
         }
     }
+}
+
+pub fn make_compile_error(
+    filename: impl Into<String>,
+    src: &str,
+    errs: impl IntoIterator<Item = (String, Span, Vec<(String, Span)>)>,
+) -> CompileError {
+    let mut files = SimpleFiles::new();
+    let file_id = files.add(filename.into(), src.to_string());
+
+    let diagnostics = errs
+        .into_iter()
+        .map(|(msg, primary, secondaries)| make_diagnostic(file_id, msg, primary, &secondaries))
+        .collect();
+
+    CompileError { files, diagnostics }
+}
+
+pub fn make_diagnostic(
+    file_id: usize,
+    msg: impl Into<String>,
+    primary: Span,
+    secondaries: &[(String, Span)],
+) -> Diagnostic<FileId> {
+    let msg_str = msg.into();
+    let mut labels = vec![Label::primary(file_id, primary).with_message(msg_str.clone())];
+    for (smsg, span) in secondaries {
+        labels.push(Label::secondary(file_id, *span).with_message(smsg.clone()));
+    }
+    Diagnostic::error()
+        .with_message(msg_str)
+        .with_labels(labels)
 }
