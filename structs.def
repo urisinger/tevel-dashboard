@@ -25,7 +25,7 @@ struct RectangleData {
 
 struct TriangleData {
   a: Point,
-  b: Point
+  b: Point,
   c: Point
 }
 
