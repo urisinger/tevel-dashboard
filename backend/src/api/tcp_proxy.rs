@@ -102,6 +102,7 @@ pub async fn ws_handler(
         ws_echo,
         dev,
         recv_history,
+        ..
     }): State<ApiState>,
 ) -> impl IntoResponse {
     let rx_out = tx_out.subscribe();

@@ -61,10 +61,10 @@ export class Expr {
   enums: { [enumName: string]: Map<string, number> };
 
   constructor(
-    types: [
+    types: (
       | { type: "Struct"; name: string; fields: [string, FieldType][] }
       | { type: "Enum"; name: string; entries: [string, number][] }
-    ]
+    )[]
   ) {
     this.structs = {};
     this.enums = {};
