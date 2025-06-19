@@ -18,5 +18,11 @@ export default defineConfig({
     },
   },
   root: 'frontend',
-  plugins: [react()],
+  plugins: [
+    react({
+      babel: {
+        plugins: [['babel-plugin-react-compiler', { target: '19' }]],
+      },
+    }),
+  ],
 })

@@ -23,8 +23,10 @@ serde_json = {version = "1", optional = true}
 futures = {version = "0.3", optional = true}
 codespan-reporting = { git = "https://github.com/urisinger/codespan-style-writer.git", optional = true}
 
+
 [features]
 default = []
 
-api = ["type_expr_compiler", "notify", "base64", "futures", "serde_json", "codespan-reporting"]
+api = ["type_expr_compiler", "base64", "futures", "serde_json", "codespan-reporting"]
 static-files = ["rust-embed", "mime_guess"]
+endnode = ["api"]

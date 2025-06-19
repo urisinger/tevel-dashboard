@@ -200,17 +200,16 @@
   color: var(--text-primary);
 }
 
-/* JSON View Styles */
 .json-view {
   padding: var(--spacing-md);
-  background-color: var(--color-primary);
+  background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
   overflow: auto;
 }
 
 .json-view pre {
   margin: 0;
-  color: var(--text-light);
+  color: var(--text-primary);
   font-family: monospace;
   line-height: 1.5;
 }

@@ -7,24 +7,22 @@ import { WebSocketProvider } from './contexts/WebSocketProvider';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 import './index.css'
+import { createRoot } from 'react-dom/client';
 
-function App() {
-  return (
-    <StrictMode>
-      <ThemeProvider>
-        <WebSocketProvider>
-          <Router>
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<SendPage />} />
-                <Route path="send" element={<SendPage />} />
-                <Route path="history" element={<HistoryPage />} />
-              </Route>
-            </Routes>
-          </Router>
-        </WebSocketProvider>
-      </ThemeProvider>
-    </StrictMode>
-  );
-}
-export default App;
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <WebSocketProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<SendPage />} />
+              <Route path="send" element={<SendPage />} />
+              <Route path="history" element={<HistoryPage />} />
+            </Route>
+          </Routes>
+        </Router>
+      </WebSocketProvider>
+    </ThemeProvider>
+  </StrictMode>
+);

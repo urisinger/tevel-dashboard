@@ -8,9 +8,9 @@
     "build": "npm run lint && tsc && vite build && npm run backend:build-release",
     "lint": "eslint .",
     "preview": "concurrently \"vite preview\" \"npm run backend:run\"",
-    "backend:build-release": "cargo build --manifest-path=backend/Cargo.toml --release --features 'api static-files'",
-    "backend:run": "cargo run --manifest-path=backend/Cargo.toml --release --features \"api\" -- --dev --structs structs.def",
-    "release": "vite build && cargo run --manifest-path=backend/Cargo.toml --release --features \"api static-files\" -- --in-addr ${IN_SERVER_IP:-127.0.0.1}:${IN_SERVER_PORT:-9001} --out-addr ${OUT_SERVER_IP:-127.0.0.1}:${OUT_SERVER_PORT:-9002} --structs structs.def"
+    "backend:build-release": "cargo build --manifest-path=backend/Cargo.toml --release --features \"api static-files endnode\"",
+    "backend:run": "cargo run --manifest-path=backend/Cargo.toml --release --features \"api\" -- --structs structs.def",
+    "release": "vite build && cargo run --manifest-path=backend/Cargo.toml --release --features \"api static-files\" -- --structs structs.def"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -23,8 +23,10 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
     "concurrently": "^8.2.2",
     "eslint": "^9.19.0",
+    "eslint-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",

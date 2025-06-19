@@ -15,7 +15,7 @@ use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
-#[command(name = "proxy-server")]
+#[command(name = "backend")]
 struct Opts {
     #[arg(long, default_value = "0.0.0.0:8080")]
     addr: SocketAddr,
