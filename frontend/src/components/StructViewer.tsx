@@ -1,139 +1,137 @@
+import { For, JSX, Switch, Match, Show } from "solid-js";
 import { Expr, FieldType, Value, ValueMap } from "../expr";
-import React from "react";
-import './StructViewer.css';
-import './shared.css';
+import "./StructViewer.css";
+import "./shared.css";
 
-
-const StructViewer: React.FC<{
+export default function StructViewer(props: {
     name?: string;
     value: Value | undefined;
     type: FieldType;
     expr: Expr;
     parentFields?: ValueMap;
-}> = ({
-    name,
-    value,
-    type,
-    expr,
-    parentFields,
-}) => {
-        const label = name && <label className="field-label">{name}</label>;
+}): JSX.Element | null {
 
-        switch (type.kind) {
-            case "Struct": {
-                const struct = expr.get(type.name);
-                if (!struct || typeof struct !== "object") {
-                    return <div className="error-message">Unknown struct: {type.name}</div>;
-                }
+    const label = props.name && <label class="field-label">{props.name}</label>;
 
-                if (!value) {
-                    return undefined;
-                }
-                const fieldMap = value as ValueMap;
+    const renderPrimitive = () => {
+        if (typeof props.value === "object") return null;
+        const display = props.value?.toString() ?? "—";
 
-                return (
-                    <div className="struct-container">
-                        {name && <div className="struct-header">{name}</div>}
-                        <div className="struct-fields">
-                            {struct.fields.map(([fieldName, fieldType]) => (
-                                <StructViewer
-                                    key={fieldName}
-                                    name={fieldName}
-                                    value={fieldMap[fieldName]}
-                                    type={fieldType}
-                                    expr={expr}
-                                    parentFields={fieldMap}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
+        let typeLabel: string;
+        if (props.type.kind === "Int") typeLabel = `${props.type.signed ? "i" : "u"}${props.type.width}`;
+        else if (props.type.kind === "Enum") typeLabel = `${props.type.name}<${props.type.width}>`;
+        else typeLabel = props.type.kind;
 
-            case "Match": {
-                const discr = parentFields?.[type.discriminant];
-                const key = typeof discr === "string"
-                    ? discr
-                    : expr.getEnum(type.enumTypeName)?.keys().next().value;
+        const classMap: Record<string, string> = {
+            Int: "integer-value",
+            Enum: "enum-value",
+            f32: "float-value",
+            f64: "float-value",
+            CString: "string-value",
+            HebrewString: "string-value",
+        };
+        const className = classMap[props.type.kind] ?? "unknown-value";
 
-                const caseType = key ? type.cases[key] : undefined;
-                if (!caseType) {
-                    return (
-                        <div className="error-message">
-                            Invalid match case for {name}: {String(key)}
+        return (
+            <div class="field-container">
+                {label}
+                <div class={`primitive-value ${className}`}>
+                    <span class="value-content">{display}</span>
+                    <span class="value-type">{typeLabel}</span>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <Switch>
+            <Match when={props.type.kind === "Struct"}>
+                <Show
+                    when={!!props.expr.get((props.type as any).name)}
+                    fallback={
+                        <div class="error-message">Unknown struct: {(type as any).name}</div>
+                    }
+                >
+                    <Show
+                        when={props.value !== undefined}
+                        fallback={null}
+                    >
+                        {(() => {
+                            const struct = props.expr.get((type as any).name)!;
+                            const fieldMap = props.value as ValueMap;
+                            return (
+                                <div class="struct-container">
+                                    {props.name && <div class="struct-header">{props.name}</div>}
+                                    <div class="struct-fields">
+                                        <For each={struct.fields}>
+                                            {([fieldName, fieldType]) => (
+                                                <StructViewer
+                                                    name={fieldName}
+                                                    value={fieldMap[fieldName]}
+                                                    type={fieldType}
+                                                    expr={props.expr}
+                                                    parentFields={fieldMap}
+                                                />
+                                            )}
+                                        </For>
+                                    </div>
+                                </div>
+                            );
+                        })()
+                        }
+                    </Show>
+                </Show>
+            </Match>
+
+            <Match when={type.kind === "Match"}>
+                {(() => {
+                    const discr = parentFields?.[type.discriminant];
+                    const key =
+                        typeof discr === "string"
+                            ? discr
+                            : props.expr.getEnum(props.type.enumTypeName)?.keys().next().value;
+                    const caseType = key ? props.type.cases[key] : undefined;
+                    return caseType ? (
+                        <StructViewer
+                            name={props.name}
+                            value={props.value}
+                            type={caseType}
+                            expr={props.expr}
+                            parentFields={props.parentFields}
+                        />
+                    ) : (
+                        <div class="error-message">
+                            Invalid match case for {props.name}: {String(key)}
                         </div>
                     );
-                }
+                })()}
+            </Match>
 
-                return (
-                    <StructViewer
-                        name={name}
-                        value={value}
-                        type={caseType}
-                        expr={expr}
-                        parentFields={parentFields}
-                    />
-                );
-            }
-
-            case "Array": {
-                const items = Array.isArray(value) ? value : [];
-                return (
-                    <div className="struct-container">
-                        {name && <div className="struct-header">{name}</div>}
-                        <div className="struct-fields">
-                            {items.map((item, i) => (
-                                <StructViewer
-                                    key={i}
-                                    name={`${name}[${i}]`}
-                                    value={item}
-                                    type={type.elementType}
-                                    expr={expr}
-                                    parentFields={parentFields}
-                                />
-                            ))}
+            <Match when={props.type.kind === "Array"}>
+                {(() => {
+                    const items = Array.isArray(props.value) ? (props.value as Value[]) : [];
+                    return (
+                        <div class="struct-container">
+                            {props.name && <div class="struct-header">{props.name}</div>}
+                            <div class="struct-fields">
+                                <For each={items}>
+                                    {(item, i) => (
+                                        <StructViewer
+                                            name={`${name}[${i()}]`}
+                                            value={item}
+                                            type={props.type.}
+                                            expr={props.expr}
+                                            parentFields={props.parentFields}
+                                        />
+                                    )}
+                                </For>
+                            </div>
                         </div>
-                    </div>
-                );
-            }
+                    );
+                })()}
+            </Match>
 
-            default: {
-                if (typeof value === "object") return undefined;
-
-                const display = value?.toString() ?? "—";
-
-                let typeLabel: string;
-                if (type.kind === "Int") {
-                    typeLabel = `${type.signed ? "i" : "u"}${type.width}`;
-                } else if (type.kind === "Enum") {
-                    typeLabel = `${type.name}<${type.width}>`;
-                } else {
-                    typeLabel = type.kind;
-                }
-
-                const classMap: Record<string, string> = {
-                    Int: "integer-value",
-                    Enum: "enum-value",
-                    f32: "float-value",
-                    f64: "float-value",
-                    CString: "string-value",
-                    HebrewString: "string-value",
-                };
-
-                const className = classMap[type.kind] || "unknown-value";
-
-                return (
-                    <div className="field-container">
-                        {label}
-                        <div className={`primitive-value ${className}`}>
-                            <span className="value-content">{display}</span>
-                            <span className="value-type">{typeLabel}</span>
-                        </div>
-                    </div>
-                );
-            }
-        };
-    }
-
-
-export default StructViewer;
+            <Match when={true}>{renderPrimitive()}</Match>
+        </Switch>
+    );
+}

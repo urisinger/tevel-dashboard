@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import solid from 'vite-plugin-solid'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,11 +18,5 @@ export default defineConfig({
     },
   },
   root: 'frontend',
-  plugins: [
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler', { target: '19' }]],
-      },
-    }),
-  ],
+  plugins: [solid()],
 })

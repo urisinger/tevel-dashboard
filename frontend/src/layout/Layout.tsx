@@ -1,25 +1,22 @@
-import React, { useState } from 'react';
-import { Sidebar } from './Sidebar';
-import { AppHeader } from './AppHeader';
-import { ContentArea } from './ContentArea';
+import { createSignal, JSX } from "solid-js";
+import Sidebar from "./Sidebar";
+import { AppHeader } from "./AppHeader";
+import { ContentArea } from "./ContentArea";
 
-export const Layout: React.FC = () => {
-    const [refreshKey, setRefreshKey] = useState(0);
+export default function Layout(): JSX.Element {
+    const [refreshKey, setRefreshKey] = createSignal(0);
 
     const handleRefresh = () => {
-        setRefreshKey(k => k + 1)
-    }
-
+        setRefreshKey((k) => k + 1);
+    };
 
     return (
-        <div className="app-container">
+        <div class="app-container">
             <Sidebar onRefresh={handleRefresh} />
-            <div className="main-content">
+            <div class="main-content">
                 <AppHeader />
-                <ContentArea refreshKey={refreshKey} />
+                <ContentArea refreshKey={refreshKey()} />
             </div>
         </div>
-    )
-};
-
-export default Layout;
+    );
+}

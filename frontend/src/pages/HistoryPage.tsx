@@ -1,72 +1,66 @@
-import React, { useEffect, useState } from "react";
-import { Expr } from "../expr";
+import { createSignal, onMount, onCleanup, For } from "solid-js";
 import BufferViewer from "../components/BufferViewer";
-import { useWebSocketContext } from "../contexts/WebSocketContext";
-import { ReadyState } from "react-use-websocket";
-import { useOutletContext } from "react-router-dom";
+import { websocket } from "../state";
+import { useExpr } from "../contexts/ExprContext";
 
+export default function HistoryPage() {
+  // history of buffers
+  const [history, setHistory] = createSignal<ArrayBuffer[]>([]);
 
-const HistoryPage: React.FC = () => {
-  const expr = useOutletContext<Expr>();
+  // connection status
+  const [isConnected, setIsConnected] = createSignal(
+    websocket.readyState === WebSocket.OPEN
+  );
 
-  const { getWebSocket, readyState } = useWebSocketContext();
-  const [messages, setMessages] = useState<ArrayBuffer[]>([]);
+  // load initial history once
+  onMount(() => {
+    fetch("/api/history")
+      .then(res => res.json())
+      .then(json => {
+        const bufs = (json as { data: string }[])
+          .map(e => Uint8Array.from(atob(e.data), c => c.charCodeAt(0)).buffer)
+          .reverse();
+        setHistory(bufs);
+      })
+      .catch(err => console.error("Failed to load initial history:", err));
+  });
 
-
-  useEffect(() => {
-    async function loadInitialHistory() {
-      try {
-        const res = await fetch("/api/history");
-        const json = await res.json() as { data: string }[];
-        const buffers: ArrayBuffer[] = json.map((entry: { data: string }) =>
-          Uint8Array.from(atob(entry.data), c => c.charCodeAt(0)).buffer
-        );
-        setMessages(buffers.reverse());
-      } catch (err) {
-        console.error("Failed to load initial history:", err);
+  onMount(() => {
+    const onOpen = () => setIsConnected(true);
+    const onClose = () => setIsConnected(false);
+    const onMessage = (e: MessageEvent) => void (async () => {
+      if (e.data instanceof Blob) {
+        const buf = await e.data.arrayBuffer();
+        setHistory(prev => [buf, ...prev]);
       }
-    }
+    })();
 
-    void loadInitialHistory();
-  }, []);
+    websocket.addEventListener("open", onOpen);
+    websocket.addEventListener("close", onClose);
+    websocket.addEventListener("message", onMessage);
 
-  useEffect(() => {
-    const ws = getWebSocket();
-    if (!ws || readyState !== ReadyState.OPEN) return;
-
-    const handleMessage = function (this: WebSocket, event: Event): void {
-      const messageEvent = event as MessageEvent;
-      void (async () => {
-        if (messageEvent.data instanceof Blob) {
-          const buffer = await messageEvent.data.arrayBuffer();
-          setMessages(prev => [buffer, ...prev]);
-        }
-      })();
-    };
-
-    ws.addEventListener("message", handleMessage);
-    return () => ws.removeEventListener("message", handleMessage);
-  }, [getWebSocket, readyState]);
+    onCleanup(() => {
+      websocket.removeEventListener("open", onOpen);
+      websocket.removeEventListener("close", onClose);
+      websocket.removeEventListener("message", onMessage);
+    });
+  });
 
   return (
-    <div className="history-page">
+    <div class="history-page">
       <h2>Live Message History</h2>
-      {readyState !== ReadyState.OPEN && (
-        <div className="warning">WebSocket is not connected</div>
+      {!isConnected() && (
+        <div class="warning">WebSocket is not connected</div>
       )}
-      <ul className="history-list">
-        {messages.map((buffer, index) => (
-          <li key={index} className="history-item">
-            <BufferViewer
-              bytes={buffer}
-              expr={expr}
-              valueType="Main"
-            />
-          </li>
-        ))}
+      <ul class="history-list">
+        <For each={history()}>
+          {buffer => (
+            <li class="history-item">
+              <BufferViewer bytes={buffer} expr={useExpr()} valueType="Main" />
+            </li>
+          )}
+        </For>
       </ul>
     </div>
   );
-};
-
-export default HistoryPage;
+}

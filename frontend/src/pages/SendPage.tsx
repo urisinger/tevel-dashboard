@@ -1,35 +1,28 @@
-import React from 'react';
-import { Expr, Value } from '../expr';
-import { useWebSocketContext } from '../contexts/WebSocketContext';
-import StructBuilder from '../components/StructBuilder';
-import { ReadyState } from 'react-use-websocket';
-import { useOutletContext } from 'react-router-dom';
+import { JSX } from "solid-js";
+import StructBuilder from "../components/StructBuilder";
+import type { Value } from "../expr";
+import { websocket } from "../state";
+import { useExpr } from "../contexts/ExprContext";
 
-
-const SendPage: React.FC = () => {
-  const expr = useOutletContext<Expr>();
-
-  const { sendMessage, readyState } = useWebSocketContext();
-
+export default function SendPage(): JSX.Element {
   const handleSubmit = (value: Value) => {
     try {
-      const bytes = expr.encodeValue(value, "Main");
-      sendMessage(bytes);
+      const bytes = useExpr().encodeValue(value, "Main");
+      websocket.send(bytes);
     } catch (e) {
-      console.error('Failed to encode value:', e);
+      console.error("Failed to encode value:", e);
     }
   };
 
   return (
-    <div className="send-page">
+    <div class="send-page">
       <StructBuilder
         structName="Main"
-        expr={expr}
-        isSocketReady={readyState === ReadyState.OPEN}
+        expr={useExpr()}
+        // 1 (OPEN)
+        isSocketReady={websocket.readyState === 1}
         onSubmit={handleSubmit}
       />
-    </div >
+    </div>
   );
-};
-
-export default SendPage;
+}

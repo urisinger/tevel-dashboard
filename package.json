@@ -13,25 +13,19 @@
     "release": "vite build && cargo run --manifest-path=backend/Cargo.toml --release --features \"api static-files\" -- --structs structs.def"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.6.2",
-    "react-use-websocket": "^4.13.0"
+    "@solid-primitives/websocket": "^1.3.1",
+    "solid-app-router": "^0.3.0",
+    "solid-js": "^1.8.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
-    "babel-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
     "concurrently": "^8.2.2",
     "eslint": "^9.19.0",
-    "eslint-plugin-react-compiler": "^19.0.0-beta-af1b7da-20250417",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-react-refresh": "^0.4.18",
+    "eslint-plugin-solid": "^0.14.5",
     "globals": "^15.14.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.22.0",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vite-plugin-solid": "^2.7.0"
   }
 }

@@ -1,53 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, } from 'react-router-dom';
-import { Expr, FieldType } from '../expr';
-import './diagnostics.css'
+import { createSignal, createEffect, JSX, Show } from "solid-js";
+import { Outlet } from "solid-app-router";
+import { Expr, FieldType } from "../expr";
+import { ExprContext } from "../contexts/ExprContext";
+import "./diagnostics.css";
 
-export const ContentArea: React.FC<{ refreshKey: number }> = ({ refreshKey }) => {
-  const [expr, setExpr] = useState<Expr | undefined>();
-  const [error, setError] = useState<string | undefined>();
+export function ContentArea(props: { refreshKey: number }): JSX.Element {
+  const [expr, setExpr] = createSignal<Expr | undefined>();
+  const [error, setError] = createSignal<string>();
 
-  useEffect(() => {
-    async function loadStructDefinition() {
-      setError(undefined);
-      setExpr(undefined);
+  createEffect(() => {
+    const rk = props.refreshKey;
+    setError(undefined);
+    setExpr(undefined);
 
-      const url = refreshKey === 0
-        ? '/api/structs.json'
-        : '/api/structs/refresh';
+    const url =
+      rk === 0 ? "/api/structs.json" : "/api/structs/refresh";
+    const init: RequestInit = rk === 0 ? {} : { method: "POST" };
 
-      const init: RequestInit = refreshKey === 0
-        ? {}
-        : { method: 'POST' };
-
-
-      try {
-        const response = await fetch(url, init);
-        if (response.status === 422) {
-          setError(await response.text());
-          return;
+    fetch(url, init)
+      .then(async (res) => {
+        if (res.status === 422) {
+          throw new Error(await res.text());
         }
-        if (!response.ok) {
-          throw new Error(`Failed to load struct definition (${response.status})`);
+        if (!res.ok) {
+          throw new Error(`Failed to load struct definition (${res.status})`);
         }
-        const input = (await response.json()) as
-          (| { type: 'Struct'; name: string; fields: [string, FieldType][] }
-            | { type: 'Enum'; name: string; entries: [string, number][] })[];
-        setExpr(new Expr(input));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    }
+        return res.json() as Promise<(
+          | { type: "Struct"; name: string; fields: [string, FieldType][] }
+          | { type: "Enum"; name: string; entries: [string, number][] }
+        )[]>;
+      })
+      .then((input) => setExpr(new Expr(input)))
+      .catch((err) => setError(err.message));
+  });
 
-    void loadStructDefinition();
-  }, [refreshKey]);
-
-  if (error) {
-    return <div className="diagnostics" dangerouslySetInnerHTML={{ __html: error }} />;
-  }
-  if (!expr) {
-    return <div className="loading">Loading struct definition…</div>;
-  }
-
-  return <Outlet context={expr} />;
-};
+  return (
+    <ExprContext.Provider value={expr()}>
+      <Show
+        when={!error()}
+        fallback={<div class="diagnostics" innerHTML={error()} />}
+      >
+        <Show
+          when={expr() !== undefined}
+          fallback={<div class="loading">Loading struct definition…</div>}
+        >
+          <Outlet />
+        </Show>
+      </Show>
+    </ExprContext.Provider>
+  );
+}

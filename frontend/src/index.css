@@ -109,7 +109,7 @@ body {
   background-color: var(--sidebar-hover);
 }
 
-.sidebar-item.active {
+.sidebar-item:active {
   background-color: var(--sidebar-active);
 }
 

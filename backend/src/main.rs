@@ -46,7 +46,6 @@ async fn main() {
             "/index.html",
             axum::routing::get(static_files::index_handler),
         )
-        .fallback_service(axum::routing::get(static_files::static_handler))
         .fallback_service(axum::routing::get(static_files::static_handler));
 
     let app = app.layer(TraceLayer::new_for_http());

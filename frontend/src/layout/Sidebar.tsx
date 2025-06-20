@@ -1,45 +1,41 @@
-import React from 'react'
-import { NavLink } from 'react-router-dom'
-import { useTheme } from '../contexts/ThemeContext'
+import { NavLink } from "solid-app-router";
+import { theme, toggleTheme } from "../state";
+import { JSX } from "solid-js";
 
-export const Sidebar: React.FC<{
-  onRefresh: () => void
-}> = ({ onRefresh }) => {
-  const { theme, toggleTheme } = useTheme()
-
+export function Sidebar(props: { onRefresh: () => void }): JSX.Element {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
+    <aside class="sidebar">
+      <div class="sidebar-header">
         <button
-          className="theme-toggle"
+          class="theme-toggle"
           onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          aria-label={`Switch to ${theme() === "light" ? "dark" : "light"} mode`}
         >
-          {theme === 'light' ? '🌙' : '☀️'}
+          {theme() === "light" ? "🌙" : "☀️"}
         </button>
         <h2>Dashboard</h2>
         <button
-          className="sidebar-item refresh-button"
-          onClick={onRefresh}
+          class="sidebar-item refresh-button"
+          onClick={() => props.onRefresh()}
           aria-label="Refresh structs definition"
         >
           🔄
         </button>
       </div>
-      <nav className="sidebar-content">
+      <nav class="sidebar-content">
         <NavLink
-          to="/"
-          className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+          href="/"
         >
           Send
         </NavLink>
         <NavLink
-          to="/history"
-          className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+          href="/history"
         >
           History
         </NavLink>
       </nav>
     </aside>
-  )
+  );
 }
+
+export default Sidebar;

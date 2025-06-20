@@ -1,182 +1,183 @@
-import React, { useEffect, useState } from "react";
-import { Expr, Value, ValueMap } from "../expr";
+import { createSignal, createEffect, For, JSX } from "solid-js";
+import { Expr, Value, ValueMap, FieldType } from "../expr";
 import StructViewer from "./StructViewer";
 
-import './BufferViewer.css';
-import './shared.css';
+import "./BufferViewer.css";
+import "./shared.css";
 
-interface BufferViewerProps {
+type BufferViewerProps = {
   bytes: ArrayBuffer;
   expr: Expr;
   valueType: string;
-}
+};
 
-const HexViewer: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
+function HexViewer(props: { data: ArrayBuffer }): JSX.Element {
   const bytesPerRow = 16;
-  const byteArray = new Uint8Array(data);
+  const byteArray = new Uint8Array(props.data);
   const rows: Uint8Array[] = [];
-
   for (let i = 0; i < byteArray.length; i += bytesPerRow) {
     rows.push(byteArray.slice(i, i + bytesPerRow));
   }
 
   return (
-    <div className="hex-viewer">
-      <div className="hex-header">
-        <div className="offset-header">Offset</div>
-        <div className="bytes-header">
-          {Array.from({ length: bytesPerRow }, (_, i) => (
-            <span key={i} className="byte-header">{i.toString(16).padStart(2, '0')}</span>
-          ))}
+    <div class="hex-viewer">
+      <div class="hex-header">
+        <div class="offset-header">Offset</div>
+        <div class="bytes-header">
+          <For each={Array.from({ length: bytesPerRow }, (_, i) => i)}>
+            {(i) => (
+              <span class="byte-header">{i.toString(16).padStart(2, "0")}</span>
+            )}
+          </For>
         </div>
-        <div className="ascii-header">ASCII</div>
+        <div class="ascii-header">ASCII</div>
       </div>
 
-      {rows.map((row, rowIndex) => {
-        const offset = rowIndex * bytesPerRow;
-
-        return (
-          <div key={rowIndex} className="hex-row">
-            <div className="offset-cell">
-              {offset.toString(16).padStart(8, '0')}
+      <For each={rows}>
+        {(row, rowIndex) => {
+          const offset = rowIndex() * bytesPerRow;
+          return (
+            <div class="hex-row">
+              <div class="offset-cell">
+                {offset.toString(16).padStart(8, "0")}
+              </div>
+              <div class="bytes-cell">
+                <For each={row}>
+                  {(byte) => (
+                    <span class="byte-value">
+                      {byte.toString(16).padStart(2, "0")}
+                    </span>
+                  )}
+                </For>
+                <For each={Array.from(
+                  { length: bytesPerRow - row.length },
+                  (_, i) => i
+                )}>
+                  {() => <span class="byte-empty">{"  "}</span>}
+                </For>
+              </div>
+              <div class="ascii-cell">
+                <For each={row}>
+                  {(byte) => {
+                    const char =
+                      byte >= 32 && byte <= 126
+                        ? String.fromCharCode(byte)
+                        : ".";
+                    return <span class="ascii-char">{char}</span>;
+                  }}
+                </For>
+              </div>
             </div>
-            <div className="bytes-cell">
-              {Array.from(row).map((byte, byteIndex) => (
-                <span key={byteIndex} className="byte-value">
-                  {byte.toString(16).padStart(2, '0')}
-                </span>
-              ))}
-              {row.length < bytesPerRow &&
-                Array.from({ length: bytesPerRow - row.length }, (_, i) => (
-                  <span key={`empty-${i}`} className="byte-empty">{"  "}</span>
-                ))}
-            </div>
-            <div className="ascii-cell">
-              {Array.from(row).map((byte, byteIndex) => {
-                const char = byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.';
-                return <span key={byteIndex} className="ascii-char">{char}</span>;
-              })}
-            </div>
-          </div>
-        );
-      })}
+          );
+        }}
+      </For>
     </div>
   );
-};
+}
 
+export default function BufferViewer(props: BufferViewerProps): JSX.Element | null {
+  const [parsedValue, setParsedValue] = createSignal<Value | undefined>();
+  const [error, setError] = createSignal<string | undefined>();
+  const [activeTab, setActiveTab] = createSignal<"structured" | "hex" | "json">(
+    "structured"
+  );
 
-// Main BufferViewer component
-const BufferViewer: React.FC<BufferViewerProps> = ({
-  bytes,
-  expr,
-  valueType
-}) => {
-  const [parsedValue, setParsedValue] = useState<Value | undefined>();
-  const [error, setError] = useState<string | undefined>();
-  const [activeTab, setActiveTab] = useState<'structured' | 'hex' | 'json'>('structured');
-
-  useEffect(() => {
+  createEffect(() => {
+    setError(undefined);
+    setParsedValue(undefined);
     try {
-      // Reset states
-      setError(undefined);
-      setParsedValue(undefined);
-
-      // Use the Expr to parse the buffer
-      const value = expr.decodeValue(bytes, valueType);
-      setParsedValue(value);
-
-
-      if (!value) {
-        setError(`Failed to parse buffer as ${valueType}`);
+      const v = props.expr.decodeValue(props.bytes, props.valueType);
+      if (!v) {
+        setError(`Failed to parse buffer as ${props.valueType}`);
       }
-
+      setParsedValue(v);
     } catch (err) {
-      setError(`Error parsing buffer: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Error parsing buffer: ${err instanceof Error ? err.message : String(err)
+        }`
+      );
     }
-  }, [bytes, expr, valueType]);
+  });
 
-  // Calculate size information
-  const bufferSize = bytes.byteLength ? bytes.byteLength : 0;
+  const bufferSize = () => props.bytes.byteLength;
 
   return (
-    <div className="enhanced-buffer-viewer">
-      <div className="viewer-header">
+    <div class="enhanced-buffer-viewer">
+      <div class="viewer-header">
         <h2>Received Data</h2>
-        <div className="buffer-info">
-          <span className="info-item">
-            <span className="info-label">Type:</span>
-            <span className="info-value">{valueType}</span>
+        <div class="buffer-info">
+          <span class="info-item">
+            <span class="info-label">Type:</span>
+            <span class="info-value">{props.valueType}</span>
           </span>
-          <span className="info-item">
-            <span className="info-label">Size:</span>
-            <span className="info-value">{bufferSize} bytes</span>
+          <span class="info-item">
+            <span class="info-label">Size:</span>
+            <span class="info-value">{bufferSize()} bytes</span>
           </span>
         </div>
       </div>
 
-      {error && (
-        <div className="viewer-error">
-          <div className="error-icon">⚠️</div>
-          <div className="error-message">{error}</div>
+      {error() && (
+        <div class="viewer-error">
+          <div class="error-icon">⚠️</div>
+          <div class="error-message">{error()}</div>
         </div>
       )}
 
-      <div className="viewer-tabs">
+      <div class="viewer-tabs">
         <button
-          className={`tab-button ${activeTab === 'structured' ? 'active' : ''}`}
-          onClick={() => setActiveTab('structured')}
+          class={`tab-button ${activeTab() === "structured" ? "active" : ""}`}
+          onClick={() => setActiveTab("structured")}
         >
           Structured View
         </button>
         <button
-          className={`tab-button ${activeTab === 'hex' ? 'active' : ''}`}
-          onClick={() => setActiveTab('hex')}
+          class={`tab-button ${activeTab() === "hex" ? "active" : ""}`}
+          onClick={() => setActiveTab("hex")}
         >
           Hex View
         </button>
         <button
-          className={`tab-button ${activeTab === 'json' ? 'active' : ''}`}
-          onClick={() => setActiveTab('json')}
+          class={`tab-button ${activeTab() === "json" ? "active" : ""}`}
+          onClick={() => setActiveTab("json")}
         >
           JSON View
         </button>
       </div>
 
-      <div className="viewer-content">
-        {activeTab === 'structured' && parsedValue && (
-          <div className="structured-view">
+      <div class="viewer-content">
+        {activeTab() === "structured" && parsedValue() !== undefined && (
+          <div class="structured-view">
             <StructViewer
-              value={parsedValue as ValueMap}
-              type={{ kind: "Struct", name: valueType }}
-              expr={expr}
+              value={parsedValue() as ValueMap}
+              type={{ kind: "Struct", name: props.valueType } as FieldType}
+              expr={props.expr}
             />
           </div>
         )}
 
-        {activeTab === 'hex' && (
-          <div className="hex-view">
-            <HexViewer data={bytes} />
+        {activeTab() === "hex" && (
+          <div class="hex-view">
+            <HexViewer data={props.bytes} />
           </div>
         )}
 
-        {activeTab === 'json' && parsedValue && (
-          <div className="json-view">
+        {activeTab() === "json" && parsedValue() !== undefined && (
+          <div class="json-view">
             <pre>
-              {JSON.stringify(parsedValue, (_, value): unknown =>
-                typeof value === 'bigint' ? value.toString() : value, 2)}
+              {JSON.stringify(
+                parsedValue(),
+                (_, v) => (typeof v === "bigint" ? v.toString() : v),
+                2
+              )}
             </pre>
           </div>
         )}
 
-        {!parsedValue && !error && (
-          <div className="no-data">
-            Waiting for data...
-          </div>
+        {!parsedValue() && !error() && (
+          <div class="no-data">Waiting for data...</div>
         )}
-
       </div>
     </div>
   );
-};
-
-export default BufferViewer;
+}
