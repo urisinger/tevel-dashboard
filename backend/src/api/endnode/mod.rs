@@ -71,25 +71,24 @@ pub async fn endnode_task(
                     Err(std::io::ErrorKind::WouldBlock.into())
                 }
             }, if tcp.is_some() => {
-                let n = match n {
-                    Ok(0) => { tcp = None; continue; },
-                    Ok(n) => n,
-                    Err(_) => { tcp = None; continue; }
-                };
+                if n == 0{
+                    tcp = None;
+                    continue;
+                }
 
                 let raw = &buf[..n];
                 match serde_json::from_slice::<Value>(raw) {
                     Ok(v) => {
                         if let Some(data) = extract_buffer(&v) {
-                            let b = Bytes::from(data.clone());
+                            let b = Bytes::from(data);
                             {
                                 let mut hist = recv_history.write();
-                                if hist.len() >= 100 { hist.pop_front() }
+                                if hist.len() >= 100 { hist.pop_front();}
                                 hist.push_back(b.clone());
                             }
                             let _ = tx_out.send(b);
                         } else {
-                            error!("JSON missing data.data array: {}", raw.escape_default());
+                            error!("JSON missing data.data array: {}", raw.escape_ascii());
                         }
                     }
                     Err(e) => {
