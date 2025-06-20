@@ -10,7 +10,6 @@ export const Layout: React.FC = () => {
         setRefreshKey(k => k + 1)
     }
 
-
     return (
         <div className="app-container">
             <Sidebar onRefresh={handleRefresh} />

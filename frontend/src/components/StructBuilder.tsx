@@ -146,7 +146,6 @@ export const FloatInput: React.FC<{
 };
 
 
-
 const StringInput = ({ name, value, onChange }: { name: string; value?: Value; onChange: (v: Value) => void }) => {
   const [val, setVal] = useValidated<string>(
     typeof value === 'string' ? value : undefined,
@@ -404,19 +403,16 @@ const ValueInput: React.FC<{
     case "Match": return <MatchInput name={name} type={type} expr={expr} parentFields={parentFields} value={value} onChange={onChange} />;
     case "Array": return <ArrayInput name={name} type={type.elementType} length={type.length} expr={expr} parentFields={parentFields} value={value} onChange={onChange} />;
   }
-  return null;
 };
-
 
 
 interface ValueFormProps {
   structName: string;
   expr: Expr;
-  isSocketReady: boolean;
   onSubmit: (value: Value) => void;
 }
 
-const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, onSubmit }) => {
+const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, onSubmit }) => {
   const [fields, setFields] = useState<ValueMap>({});
   const struct = expr.get(structName);
 
@@ -452,10 +448,9 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
         <div className="form-actions">
           <button
             type="submit"
-            disabled={!isSocketReady}
             className="submit-button"
           >
-            {!isSocketReady ? "WebSocket Disconnected" : "Send to WebSocket"}
+            {"Send packet"}
           </button>
         </div>
       </form>

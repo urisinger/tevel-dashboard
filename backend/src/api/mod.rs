@@ -1,23 +1,21 @@
-use std::{collections::VecDeque, path::PathBuf, sync::Arc};
+use std::{collections::VecDeque, convert::Infallible, path::PathBuf, sync::Arc};
 
 use axum::{
     body::Bytes,
-    extract::{
-        ws::{Message, WebSocket},
-        State, WebSocketUpgrade,
-    },
+    extract::State,
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{sse::Event, Html, IntoResponse, Response, Sse},
     routing::{get, post},
     Json, Router,
 };
-use base64::{engine::general_purpose::STANDARD as base64_engine, Engine};
+use base64::{engine::general_purpose, Engine};
 use clap::Parser;
 use codespan_reporting::term;
-use futures::{SinkExt, StreamExt};
+use futures::{Stream, StreamExt};
 use parking_lot::RwLock;
 use serde_json::Value;
 use tokio::{fs, sync::broadcast};
+use tokio_stream::wrappers::BroadcastStream;
 use tracing::error;
 use type_expr_compiler::{compile, writer::render_diagnostics};
 
@@ -92,26 +90,11 @@ pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
     ));
 
     Router::new()
-        .route("/ws/", get(ws_handler))
         .route("/history", get(history_handler))
+        .route("/send", post(send_packet))
         .route("/structs.json", get(serve_structs_json))
         .route("/structs/refresh", post(refresh_structs_handler))
         .with_state(state)
-}
-
-async fn history_handler(State(state): State<ApiState>) -> impl IntoResponse {
-    let hist = state.recv_history.read();
-    let payloads: Vec<_> = hist
-        .iter()
-        .map(|msg| {
-            serde_json::json!({
-                "type": "Outbound",
-                "data": base64_engine.encode(msg),
-            })
-        })
-        .collect();
-
-    Json(payloads)
 }
 
 async fn serve_structs_json(State(state): State<ApiState>) -> Response {
@@ -147,46 +130,49 @@ async fn load_structs(path: &PathBuf) -> Result<Value, String> {
     }
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<ApiState>) -> impl IntoResponse {
-    let state = state.clone();
+async fn history_handler(
+    State(state): State<ApiState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let history_b64: Vec<String> = {
+        let hist = state.recv_history.read();
+        hist.iter()
+            .map(|b| general_purpose::STANDARD.encode(b))
+            .collect()
+    };
 
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+    let history_json =
+        serde_json::to_string(&history_b64).expect("failed to serialize history array");
+
+    let history_event = Event::default().event("history").data(history_json);
+    let live_stream = BroadcastStream::new(state.tx_out.subscribe())
+        .filter_map(|res| async move { res.ok() })
+        .map(|bytes: Bytes| {
+            let b64 = general_purpose::STANDARD.encode(&bytes);
+            Ok(Event::default().event("packet").data(b64))
+        });
+
+    let stream =
+        futures::stream::once(async { Ok::<_, Infallible>(history_event) }).chain(live_stream);
+
+    Sse::new(stream)
 }
 
-async fn handle_socket(socket: WebSocket, state: ApiState) {
-    let mut rx_out = state.tx_out.subscribe();
-
-    let (mut ws_tx, mut ws_rx) = socket.split();
-
-    let client_to_backend = async {
-        while let Some(Ok(Message::Binary(data))) = ws_rx.next().await {
-            #[cfg(feature = "endnode")]
-            {
-                let _ = state.tx_in.send(data).await;
-            }
-
-            #[cfg(not(feature = "endnode"))]
-            {
-                let mut hist = state.recv_history.write();
-                if hist.len() >= 100 {
-                    hist.pop_front();
-                }
-                hist.push_back(data.clone());
-                let _ = state.tx_out.send(data);
-            }
-        }
-    };
-
-    let backend_to_client = async {
-        while let Ok(msg) = rx_out.recv().await {
-            if ws_tx.send(Message::Binary(msg)).await.is_err() {
-                break;
-            }
-        }
-    };
-
-    tokio::select! {
-        _ = client_to_backend => {},
-        _ = backend_to_client => {},
+async fn send_packet(State(state): State<ApiState>, body: Bytes) -> impl IntoResponse {
+    #[cfg(feature = "endnode")]
+    {
+        _ = state.tx_in.send(body).await;
     }
+    #[cfg(not(feature = "endnode"))]
+    {
+        {
+            let mut hist = state.recv_history.write();
+            if hist.len() >= 100 {
+                hist.pop_front();
+            }
+            hist.push_back(body.clone());
+        }
+        _ = state.tx_out.send(body);
+    }
+
+    StatusCode::OK
 }
