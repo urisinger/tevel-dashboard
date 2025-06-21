@@ -1,16 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    lexer::Span,
-    parser::{DefinitionAST, FieldAST},
-};
+use crate::syntax::{DefinitionAST, FieldAST, Span};
 
 /// Validate a FieldAST for basic type existence (structs/enums).
 /// Validate a FieldAST for type existence and exhaustiveness:
 /// - Struct: ensures the named struct exists in `built_types` and in `parent_fields`.
 /// - Match: ensures discriminant is an enum, enum exists, variants are known, and exhaustiveness.
 /// - Array: recurses into element type.
-pub fn check_definitions(
+pub fn check_usage(
     types: &HashMap<String, DefinitionAST>,
     mut emit: impl FnMut(String, Span, Span),
 ) {
@@ -33,7 +30,7 @@ pub fn check_definitions(
                         );
                     }
 
-                    check_field(&field.0, &enum_names, types, &mut |e, s| {
+                    check_field_usage(&field.0, &enum_names, types, &mut |e, s| {
                         emit(e, s, ast.name_span())
                     });
                 }
@@ -55,7 +52,7 @@ pub fn check_definitions(
     }
 }
 
-fn check_field(
+fn check_field_usage(
     ast: &FieldAST,
     field_enum_names: &HashMap<String, Option<String>>,
     built_types: &HashMap<String, DefinitionAST>,
@@ -63,7 +60,6 @@ fn check_field(
 ) {
     match ast {
         FieldAST::Struct { name } => {
-            // Check that struct exists in definitions
             if !built_types.contains_key(&name.0) {
                 emit(format!("Undefined struct type '{}'", name.0), name.1);
             }
@@ -135,81 +131,13 @@ fn check_field(
                     );
                 }
             }
-            // Recurse into each case's field AST
             for ((_, (ft_ast, _)), _) in &cases.0 {
-                check_field(ft_ast, field_enum_names, built_types, emit);
+                check_field_usage(ft_ast, field_enum_names, built_types, emit);
             }
         }
         FieldAST::Array { element_type, .. } => {
-            check_field(&element_type.0, field_enum_names, built_types, emit);
+            check_field_usage(&element_type.0, field_enum_names, built_types, emit);
         }
         _ => {}
     }
-}
-
-pub fn check_recursion(
-    built_types: &HashMap<String, DefinitionAST>,
-    mut emit: impl FnMut(String, Span),
-) {
-    fn dfs<'a>(
-        node: &'a str,
-        built_types: &'a HashMap<String, DefinitionAST>,
-        stack: &mut Vec<&'a str>,
-        visited: &mut HashSet<&'a str>,
-        emit: &mut impl FnMut(String),
-    ) {
-        if stack.contains(&node) {
-            let cycle = stack
-                .iter()
-                .chain(std::iter::once(&node))
-                .cloned()
-                .collect::<Vec<_>>();
-            let path = cycle.join(" -> ");
-            emit(format!("Recursive struct definition detected: {}", path));
-            return;
-        }
-        if visited.contains(node) {
-            return;
-        }
-        visited.insert(node);
-        stack.push(node);
-        if let Some(neighbors) = get_referenced_structs(built_types, node) {
-            for nbr in neighbors {
-                dfs(nbr, built_types, stack, visited, emit);
-            }
-        }
-        stack.pop();
-    }
-
-    let mut visited = HashSet::new();
-    let mut stack = Vec::new();
-    for (name, def) in built_types {
-        dfs(name, built_types, &mut stack, &mut visited, &mut |e| {
-            emit(e, def.name_span())
-        });
-    }
-}
-
-fn get_referenced_structs<'a>(
-    built_types: &'a HashMap<String, DefinitionAST>,
-    struct_name: &'a str,
-) -> Option<impl Iterator<Item = &'a str> + 'a> {
-    built_types.get(struct_name).and_then(|def| {
-        if let DefinitionAST::Struct { fields, .. } = def {
-            Some(
-                fields
-                    .0
-                    .iter()
-                    .filter_map(move |((_, (field_type, _)), _)| {
-                        if let FieldAST::Struct { name } = field_type {
-                            Some(name.0.as_str())
-                        } else {
-                            None
-                        }
-                    }),
-            )
-        } else {
-            None
-        }
-    })
 }

@@ -19,7 +19,7 @@ use parking_lot::RwLock;
 use serde_json::Value;
 use tokio::{fs, sync::broadcast};
 use tracing::error;
-use type_expr_compiler::{compile, writer::render_diagnostics};
+use type_expr_compiler::{compile, diagnostics::render_diagnostics};
 
 #[cfg(feature = "endnode")]
 use std::{net::SocketAddr, time::Duration};

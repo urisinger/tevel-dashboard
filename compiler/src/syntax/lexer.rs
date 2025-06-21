@@ -1,6 +1,6 @@
 use std::fmt;
 
-use chumsky::span::SimpleSpan;
+use super::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token<'a> {
@@ -65,9 +65,6 @@ impl<'a> fmt::Display for Token<'a> {
         }
     }
 }
-
-pub type Span = SimpleSpan;
-pub type Spanned<T> = (T, Span);
 
 pub struct Lexer<'a> {
     input: &'a str,
