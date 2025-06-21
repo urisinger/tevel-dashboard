@@ -29,13 +29,13 @@ export const Sidebar: React.FC<{
       <nav className="sidebar-content">
         <NavLink
           to="/"
-          className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+          className="sidebar-item"
         >
           Send
         </NavLink>
         <NavLink
           to="/history"
-          className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+          className="sidebar-item"
         >
           History
         </NavLink>

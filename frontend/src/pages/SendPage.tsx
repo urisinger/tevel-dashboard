@@ -1,4 +1,3 @@
-import React from 'react';
 import { Expr, Value } from '../expr';
 import { useWebSocketContext } from '../contexts/WebSocketContext';
 import StructBuilder from '../components/StructBuilder';
@@ -6,7 +5,7 @@ import { ReadyState } from 'react-use-websocket';
 import { useOutletContext } from 'react-router-dom';
 
 
-const SendPage: React.FC = () => {
+export default function SendPage() {
   const expr = useOutletContext<Expr>();
 
   const { sendMessage, readyState } = useWebSocketContext();
@@ -31,5 +30,3 @@ const SendPage: React.FC = () => {
     </div >
   );
 };
-
-export default SendPage;

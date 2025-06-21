@@ -5,11 +5,7 @@ import StructViewer from "./StructViewer";
 import './BufferViewer.css';
 import './shared.css';
 
-interface BufferViewerProps {
-  bytes: ArrayBuffer;
-  expr: Expr;
-  valueType: string;
-}
+
 
 const HexViewer: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
   const bytesPerRow = 16;
@@ -66,11 +62,15 @@ const HexViewer: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
 
 
 // Main BufferViewer component
-const BufferViewer: React.FC<BufferViewerProps> = ({
+export default function BufferViewer({
   bytes,
   expr,
   valueType
-}) => {
+}: {
+  bytes: ArrayBuffer;
+  expr: Expr;
+  valueType: string;
+}) {
   const [parsedValue, setParsedValue] = useState<Value | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<'structured' | 'hex' | 'json'>('structured');
@@ -179,4 +179,3 @@ const BufferViewer: React.FC<BufferViewerProps> = ({
   );
 };
 
-export default BufferViewer;

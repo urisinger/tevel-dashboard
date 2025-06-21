@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Expr } from "../expr";
 import BufferViewer from "../components/BufferViewer";
 import { useWebSocketContext } from "../contexts/WebSocketContext";
@@ -6,7 +6,7 @@ import { ReadyState } from "react-use-websocket";
 import { useOutletContext } from "react-router-dom";
 
 
-const HistoryPage: React.FC = () => {
+export default function HistoryPage() {
   const expr = useOutletContext<Expr>();
 
   const { getWebSocket, readyState } = useWebSocketContext();
@@ -69,4 +69,3 @@ const HistoryPage: React.FC = () => {
   );
 };
 
-export default HistoryPage;

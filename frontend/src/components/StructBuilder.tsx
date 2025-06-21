@@ -409,14 +409,17 @@ const ValueInput: React.FC<{
 
 
 
-interface ValueFormProps {
+export default function StructBuilder({
+  structName,
+  expr,
+  isSocketReady,
+  onSubmit,
+}: {
   structName: string;
   expr: Expr;
   isSocketReady: boolean;
   onSubmit: (value: Value) => void;
-}
-
-const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, onSubmit }) => {
+}) {
   const [fields, setFields] = useState<ValueMap>({});
   const struct = expr.get(structName);
 
@@ -462,5 +465,3 @@ const ValueForm: React.FC<ValueFormProps> = ({ structName, expr, isSocketReady, 
     </div>
   );
 };
-
-export default ValueForm;
