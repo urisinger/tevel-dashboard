@@ -60,17 +60,17 @@ const HexViewer: React.FC<{ data: ArrayBuffer }> = ({ data }) => {
   );
 };
 
+interface Props {
+  bytes: ArrayBuffer;
+  expr: Expr;
+  valueType: string;
+}
 
-// Main BufferViewer component
 export default function BufferViewer({
   bytes,
   expr,
   valueType
-}: {
-  bytes: ArrayBuffer;
-  expr: Expr;
-  valueType: string;
-}) {
+}: Props) {
   const [parsedValue, setParsedValue] = useState<Value | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<'structured' | 'hex' | 'json'>('structured');
@@ -95,7 +95,6 @@ export default function BufferViewer({
     }
   }, [bytes, expr, valueType]);
 
-  // Calculate size information
   const bufferSize = bytes.byteLength ? bytes.byteLength : 0;
 
   return (

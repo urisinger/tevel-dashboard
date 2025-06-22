@@ -1,12 +1,13 @@
 import js from '@eslint/js'
 import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
+import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh'
+import { configs as reactCompilerConfigs } from "eslint-plugin-react-compiler";
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['frontend/dist'] },
   {
+    ignores: ['frontend/dist'],
     extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -30,4 +31,5 @@ export default tseslint.config(
       ],
     },
   },
+  reactCompilerConfigs.recommended,
 )

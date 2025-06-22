@@ -14,12 +14,12 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as base64_engine, Engine};
 use clap::Parser;
 use codespan_reporting::term;
+use compiler::{compile, diagnostics::render_diagnostics};
 use futures::{SinkExt, StreamExt};
 use parking_lot::RwLock;
 use serde_json::Value;
 use tokio::{fs, sync::broadcast};
 use tracing::error;
-use type_expr_compiler::{compile, diagnostics::render_diagnostics};
 
 #[cfg(feature = "endnode")]
 use std::{net::SocketAddr, time::Duration};
