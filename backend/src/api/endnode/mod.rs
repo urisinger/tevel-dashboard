@@ -3,8 +3,7 @@ use parking_lot::RwLock;
 use serde_json::{json, Value};
 use std::{collections::VecDeque, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
+    net::{TcpListener, TcpStream},
     select,
     sync::{broadcast, mpsc},
     time::sleep,
@@ -21,6 +20,7 @@ fn extract_buffer(v: &Value) -> Option<Vec<u8>> {
         .into()
 }
 
+/// Spawns your TCP server and hands off each connection to `handle_client`.
 pub async fn endnode_task(
     addr: SocketAddr,
     retry_delay: Duration,
@@ -28,52 +28,82 @@ pub async fn endnode_task(
     tx_out: broadcast::Sender<Bytes>,
     recv_history: Arc<RwLock<VecDeque<Bytes>>>,
 ) {
-    let mut tcp: Option<TcpStream> = None;
+    // 1. Bind the listener
+    let listener = loop {
+        match TcpListener::bind(addr).await {
+            Ok(l) => {
+                info!("TCP server listening on {}", addr);
+                break l;
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to bind {}, retrying in {:?}: {}",
+                    addr, retry_delay, e
+                );
+                sleep(retry_delay).await;
+            }
+        }
+    };
+
+    // 2. Accept loop
+    loop {
+        match listener.accept().await {
+            Ok((stream, peer)) => {
+                info!("New client from {}", peer);
+                let rx_in_clone = rx_in.clone();
+                let tx_out_clone = tx_out.clone();
+                let history_clone = recv_history.clone();
+
+                // 3. Spawn a per‑connection task
+                tokio::spawn(async move {
+                    if let Err(e) =
+                        handle_client(stream, rx_in_clone, tx_out_clone, history_clone).await
+                    {
+                        error!("Connection {} closed with error: {}", peer, e);
+                    } else {
+                        info!("Connection {} cleanly closed", peer);
+                    }
+                });
+            }
+            Err(e) => {
+                error!("Accept failed: {}", e);
+                sleep(retry_delay).await;
+            }
+        }
+    }
+}
+
+/// Handles a single client: reads JSON blobs, pushes to history/broadcasts,
+/// and writes any incoming `rx_in` frames out over the socket.
+async fn handle_client(
+    mut tcp: TcpStream,
+    mut rx_in: mpsc::Receiver<Bytes>,
+    tx_out: broadcast::Sender<Bytes>,
+    recv_history: Arc<RwLock<VecDeque<Bytes>>>,
+) -> std::io::Result<()> {
     let mut buf = vec![0u8; 4096];
 
     loop {
-        if tcp.is_none() {
-            match TcpStream::connect(addr).await {
-                Ok(s) => {
-                    s.set_nodelay(true).ok();
-                    info!("connected");
-                    tcp = Some(s)
-                }
-                Err(e) => {
-                    warn!("connect failed: {}", e);
-                }
-            }
-        }
-
         select! {
-            Some(raw) = rx_in.recv(), if tcp.is_some() => {
+            // Outbound: data coming from your channel → write JSON to the client
+            Some(raw) = rx_in.recv() => {
                 let pkt = json!({
                     "data": {
                         "type": "Buffer",
                         "data": raw.to_vec()
                     }
                 });
-                match serde_json::to_vec(&pkt) {
-                    Ok(js) => {
-                        if let Err(e) = tcp.as_mut().unwrap().write_all(&js).await {
-                            error!("send failed: {}", e);
-                            tcp = None;
-                        }
-                    }
-                    Err(e) => error!("JSON serialize failed: {}", e),
-                }
+                let js = serde_json::to_vec(&pkt)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                tcp.write_all(&js).await?;
             }
 
-            Ok(n) = async {
-                if let Some(sock) = tcp.as_mut() {
-                    sock.read(&mut buf).await
-                } else {
-                    Err(std::io::ErrorKind::WouldBlock.into())
-                }
-            }, if tcp.is_some() => {
-                if n == 0{
-                    tcp = None;
-                    continue;
+            // Inbound: data arriving from the client → parse JSON, store & broadcast
+            result = tcp.read(&mut buf) => {
+                let n = result?;
+                if n == 0 {
+                    // client closed
+                    return Ok(());
                 }
 
                 let raw = &buf[..n];
@@ -83,22 +113,23 @@ pub async fn endnode_task(
                             let b = Bytes::from(data);
                             {
                                 let mut hist = recv_history.write();
-                                if hist.len() >= 100 { hist.pop_front();}
+                                if hist.len() >= 100 { hist.pop_front(); }
                                 hist.push_back(b.clone());
                             }
                             let _ = tx_out.send(b);
                         } else {
-                            error!("JSON missing data.data array: {}", raw.escape_ascii());
+                            warn!("JSON missing data array: {}", String::from_utf8_lossy(raw));
                         }
                     }
                     Err(e) => {
-                        error!("JSON parse error ({} bytes): {}", n, e);
+                        warn!("JSON parse error ({} bytes): {}", n, e);
                     }
                 }
             }
 
+            // Prevent busy‑looping if both channels & socket are idle
             else => {
-                sleep(retry_delay).await;
+                sleep(Duration::from_millis(10)).await;
             }
         }
     }
