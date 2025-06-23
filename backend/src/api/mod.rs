@@ -35,10 +35,6 @@ pub struct ApiOpts {
     #[clap(long, default_value = "127.0.0.1:9002")]
     pub endnode_addr: SocketAddr,
 
-    #[cfg(feature = "endnode")]
-    #[clap(long, default_value_t = 2)]
-    pub retry_delay: u64,
-
     #[clap(long, default_value_t = 64)]
     pub in_chan_capacity: usize,
 
@@ -85,7 +81,6 @@ pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
     #[cfg(feature = "endnode")]
     tokio::spawn(endnode::endnode_task(
         opt.endnode_addr,
-        Duration::from_secs(opt.retry_delay),
         rx_in,
         tx_out,
         state.recv_history.clone(),
