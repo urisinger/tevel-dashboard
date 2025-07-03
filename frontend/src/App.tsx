@@ -7,7 +7,6 @@ import { Route, Router, Routes } from "solid-app-router";
 import { createRoot } from "solid-js";
 
 
-
 createRoot(() =>
   <Router>
     <Routes>

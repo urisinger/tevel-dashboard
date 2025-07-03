@@ -14,12 +14,12 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as base64_engine, Engine};
 use clap::Parser;
 use codespan_reporting::term;
+use compiler::{compile, diagnostics::render_diagnostics};
 use futures::{SinkExt, StreamExt};
 use parking_lot::RwLock;
 use serde_json::Value;
 use tokio::{fs, sync::broadcast};
 use tracing::error;
-use type_expr_compiler::{compile, writer::render_diagnostics};
 
 #[cfg(feature = "endnode")]
 use std::{net::SocketAddr, time::Duration};
@@ -34,10 +34,6 @@ pub struct ApiOpts {
     #[cfg(feature = "endnode")]
     #[clap(long, default_value = "127.0.0.1:9002")]
     pub endnode_addr: SocketAddr,
-
-    #[cfg(feature = "endnode")]
-    #[clap(long, default_value_t = 2)]
-    pub retry_delay: u64,
 
     #[clap(long, default_value_t = 64)]
     pub in_chan_capacity: usize,
@@ -85,7 +81,6 @@ pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
     #[cfg(feature = "endnode")]
     tokio::spawn(endnode::endnode_task(
         opt.endnode_addr,
-        Duration::from_secs(opt.retry_delay),
         rx_in,
         tx_out,
         state.recv_history.clone(),

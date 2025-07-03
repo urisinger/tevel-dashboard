@@ -3,8 +3,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import solid from "eslint-plugin-solid/configs/typescript";
 
+
 export default tseslint.config(
-  { ignores: ['frontend/dist'] },
   {
     extends: [
       js.configs.recommended,

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::parser::{DefinitionAST, FieldAST};
+use crate::syntax::{DefinitionAST, FieldAST};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
