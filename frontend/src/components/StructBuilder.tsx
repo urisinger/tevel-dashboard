@@ -1,20 +1,19 @@
-import { createSignal, createEffect, createMemo, For, JSX } from "solid-js";
+import { createSignal, createEffect, createMemo, For, JSX, Switch, Match, Show, Accessor } from "solid-js";
 import { Expr, Value, FieldType, Struct, ValueMap, ArrayLength, isValueMap } from "../expr";
 import "./StructBuilder.css";
 import "./shared.css";
 
-function wrapInput(name: string, typeKind: string, input: JSX.Element) {
+function wrapInput(name: Accessor<string>, typeKind: Accessor<string>, input: JSX.Element) {
   return (
     <div class="field-container">
       <label class="field-label">
-        {name}: <span class="field-type">{typeKind}</span>
+        {name()}: <span class="field-type">{typeKind()}</span>
       </label>
       {input}
     </div>
   );
 }
 
-// ========== Inputs ==========
 
 function IntegerInput(props: {
   name: string;
@@ -24,53 +23,53 @@ function IntegerInput(props: {
   value?: Value;
   onChange: (v: Value) => void;
 }): JSX.Element {
-  const { name, signed, width, defaultNumber, value, onChange } = props;
-  const typeKind = `${signed ? "i" : "u"}${width}`;
-  const [text, setText] = createSignal(
-    value !== undefined && typeof value === "bigint"
-      ? value.toString()
-      : defaultNumber.toString()
-  );
+  const getInitialText = () =>
+    typeof props.value === "bigint"
+      ? props.value.toString()
+      : props.defaultNumber.toString();
+
+  const [text, setText] = createSignal<string>(getInitialText());
+
   const [error, setError] = createSignal<string | null>(null);
 
-  const maxUnsigned = (1n << BigInt(width)) - 1n;
-  const minSigned = -(1n << BigInt(width - 1));
-  const maxSigned = (1n << BigInt(width - 1)) - 1n;
+  const maxUnsigned = () => (1n << BigInt(props.width)) - 1n;
+  const minSigned = () => -(1n << BigInt(props.width - 1));
+  const maxSigned = () => (1n << BigInt(props.width - 1)) - 1n;
 
   const handleChange = (t: string) => {
     setText(t);
-    if (t === "" || (t === "-" && signed)) {
+    if (t === "" || (t === "-" && props.signed)) {
       setError(null);
       return;
     }
     try {
       const bi = BigInt(t);
-      if (!signed) {
-        if (bi < 0n || bi > maxUnsigned) {
-          setError(`Must be 0 … ${maxUnsigned}`);
+      if (!props.signed) {
+        if (bi < 0n || bi > maxUnsigned()) {
+          setError(`Must be 0 … ${maxUnsigned()}`);
           return;
         }
       } else {
-        if (bi < minSigned || bi > maxSigned) {
-          setError(`Must be ${minSigned} … ${maxSigned}`);
+        if (bi < minSigned() || bi > maxSigned()) {
+          setError(`Must be ${minSigned()} … ${maxSigned()}`);
           return;
         }
       }
       setError(null);
-      onChange(bi);
+      props.onChange(bi);
     } catch {
       setError(null);
     }
   };
 
   return wrapInput(
-    name,
-    typeKind,
+    () => props.name,
+    () => `${props.signed ? "i" : "u"}${props.width}`,
     <>
       <input
         type="text"
         inputMode="numeric"
-        pattern={signed ? "[0-9\\-]*" : "[0-9]*"}
+        pattern={props.signed ? "[0-9\\-]*" : "[0-9]*"}
         value={text()}
         class={`field-input integer-value ${error() ? "invalid" : ""}`}
         onInput={(e) => handleChange((e.target as HTMLInputElement).value)}
@@ -87,27 +86,26 @@ function FloatInput(props: {
   value?: Value;
   onChange: (v: Value) => void;
 }): JSX.Element {
-  const { name, width, defaultNumber, value, onChange } = props;
-  const typeKind = `F${width}`;
-  const [text, setText] = createSignal(
-    value !== undefined && typeof value === "number"
-      ? value.toString()
-      : defaultNumber.toString()
-  );
+  const getInitialText = () =>
+    typeof props.value === "number"
+      ? props.value.toString()
+      : props.defaultNumber.toString();
+
+  const [text, setText] = createSignal<string>(getInitialText());
 
   const handle = (t: string) => {
     setText(t);
     if (t === "") {
-      onChange(0);
+      props.onChange(0);
       return;
     }
     const n = parseFloat(t);
-    if (!Number.isNaN(n)) onChange(n);
+    if (!Number.isNaN(n)) props.onChange(n);
   };
 
   return wrapInput(
-    name,
-    typeKind,
+    () => props.name,
+    () => `F${props.width}`,
     <input
       type="text"
       inputMode="decimal"
@@ -123,18 +121,19 @@ function StringInput(props: {
   value?: Value;
   onChange: (v: Value) => void;
 }): JSX.Element {
-  const { name, value, onChange } = props;
   const isStr = (v: Value): v is string => typeof v === "string";
-  const [val, setVal] = createSignal(
-    value !== undefined && isStr(value) ? value : ""
-  );
+  const getInitialText = () =>
+    props.value !== undefined && isStr(props.value) ? props.value : "";
+
+  const [val, setVal] = createSignal<string>(getInitialText());
+
   createEffect(() => {
-    if (value !== undefined && isStr(value)) setVal(value);
+    if (props.value !== undefined && isStr(props.value)) setVal(props.value);
   });
 
   return wrapInput(
-    name,
-    "String",
+    () => props.name,
+    () => "String",
     <input
       type="text"
       value={val()}
@@ -142,13 +141,51 @@ function StringInput(props: {
       onInput={(e) => {
         const s = (e.target as HTMLInputElement).value;
         setVal(s);
-        onChange(s);
+        props.onChange(s);
       }}
     />
   );
 }
 
-// ========== Recursive Inputs ==========
+function EnumInput(props: {
+  name: string;
+  type: Extract<FieldType, { kind: "Enum" }>;
+  expr: Expr;
+  value?: Value;
+  onChange: (v: string) => void;
+}): JSX.Element {
+  const enumDef = createMemo(() => props.expr.getEnum(props.type.name));
+  const defaultKey = createMemo(() => props.expr.defaultValue(props.type) as string);
+
+  const selectedKey = createMemo(() => {
+    const v = props.value;
+    return typeof v === "string" && enumDef()?.has(v) ? v : defaultKey();
+  });
+
+  return (
+    <Show
+      when={enumDef()}
+      fallback={<div class="error-message">Enum “{props.type.name}” not found</div>}
+    >
+      {(enumDef) => (
+        <div class="field-container">
+          <label class="field-label">
+            {props.name}: <span class="field-type">{props.type.name}</span>
+          </label>
+          <select
+            class="field-input enum-value"
+            value={selectedKey()}
+            onChange={(e) => props.onChange(e.currentTarget.value)}
+          >
+            <For each={[...enumDef().keys()]}>
+              {(key) => <option value={key}>{key}</option>}
+            </For>
+          </select>
+        </div>
+      )}
+    </Show>
+  );
+}
 
 function StructInput(props: {
   name: string;
@@ -157,33 +194,30 @@ function StructInput(props: {
   value?: Value;
   onChange: (v: ValueMap) => void;
 }): JSX.Element {
-  const { name, struct, expr, value, onChange } = props;
-  const initial = createMemo(() =>
-    isValueMap(value) ? (value as ValueMap) : {}
-  );
+  const initial = createMemo(() => isValueMap(props.value) ? props.value : {});
   const [fields, setFields] = createSignal<ValueMap>(initial());
   createEffect(() => {
-    if (isValueMap(value)) setFields(value as ValueMap);
+    if (isValueMap(props.value)) setFields(props.value);
   });
 
   return (
     <div class="struct-container">
       <div class="struct-header">
-        <span class="struct-name">{name}</span>
+        <span class="struct-name">{props.name}</span>
       </div>
       <div class="struct-fields">
-        <For each={struct.fields}>
+        <For each={props.struct.fields}>
           {([fname, ftype]) => (
             <ValueInput
               name={fname}
               type={ftype}
-              expr={expr}
+              expr={props.expr}
               parentFields={fields()}
               value={fields()[fname]}
               onChange={(v) => {
                 const nxt = { ...fields(), [fname]: v };
                 setFields(nxt);
-                onChange(nxt);
+                props.onChange(nxt);
               }}
             />
           )}
@@ -202,61 +236,37 @@ function ArrayInput(props: {
   value?: Value;
   onChange: (v: (Value | undefined)[]) => void;
 }): JSX.Element {
-  const { name, type, length, expr, parentFields, value, onChange } = props;
-  const computedLength = createMemo(() => {
-    if (length.kind === "Static") return length.value;
-    const v = parentFields[length.field];
-    return typeof v === "number"
-      ? v
-      : typeof v === "bigint"
-        ? Number(v)
-        : 0;
-  });
+  const length = createMemo(() => {
+    if (props.length.kind === "Static") return props.length.value;
+    const v = props.parentFields[props.length.field];
+    return typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : 0;
+  })
 
-  const initialItems = createMemo(() =>
-    Array.isArray(value) && (value as Value[]).length === computedLength()
-      ? (value as Value[])
-      : Array.from(
-        { length: computedLength() },
-        () => expr.defaultValue(type, parentFields)
-      )
-  );
-  const [items, setItems] = createSignal<Value[]>(initialItems());
-  createEffect(() => {
-    setItems((prev) =>
-      Array.from({ length: computedLength() }, (_, i) =>
-        prev[i] ?? expr.defaultValue(type, parentFields)
-      )
-    );
-  });
-  createEffect(() => {
-    if (
-      Array.isArray(value) &&
-      (value as Value[]).length === computedLength()
-    ) {
-      setItems(value as Value[]);
-    }
-  });
+  const items = createMemo<Value[]>(() => {
+    const len = length();
+    const defaultValue = props.expr.defaultValue(props.type, props.parentFields);
+    if (Array.isArray(props.value) && props.value.length === len) return props.value as Value[];
+    return Array.from({ length: len }, () => defaultValue);
+  })
 
   return (
     <div class="struct-container">
       <div class="struct-header">
-        <span class="struct-name">{name}</span>
+        <span class="struct-name">{props.name}</span>
       </div>
       <div class="struct-fields">
         <For each={items()}>
           {(it, i) => (
             <ValueInput
-              name={`${name}[${i()}]`}
-              type={type}
-              expr={expr}
-              parentFields={parentFields}
+              name={`${props.name}[${i()}]`}
+              type={props.type}
+              expr={props.expr}
+              parentFields={props.parentFields}
               value={it}
               onChange={(v) => {
                 const nxt = [...items()];
                 nxt[i()] = v;
-                setItems(nxt);
-                onChange(nxt);
+                props.onChange(nxt);
               }}
             />
           )}
@@ -266,10 +276,58 @@ function ArrayInput(props: {
   );
 }
 
-// ========== Other Inputs: Enum & Match ==========
-// (similar pattern; left out for brevity)
+function MatchInput(props: {
+  name: string;
+  type: Extract<FieldType, { kind: "Match" }>;
+  expr: Expr;
+  parentFields: ValueMap;
+  value?: Value;
+  onChange: (v: Value) => void;
+}): JSX.Element {
+  const enumKey = createMemo(() => {
+    const d = props.parentFields[props.type.discriminant];
+    return typeof d === "string"
+      ? d
+      : props.expr.getEnum(props.type.enumTypeName)?.keys().next().value;
+  });
 
-// ========== ValueInput dispatcher ==========
+  const caseType = createMemo(() => enumKey() != undefined ? props.type.cases[enumKey()!] : undefined);
+
+  const innerValue = createMemo(() => {
+    if (caseType() == undefined) return undefined;
+    if (props.expr.valueMatchesType(props.value, caseType()!)) return props.value;
+    return undefined;
+  });
+
+  return (
+    <Switch>
+      <Match when={!enumKey()}>
+        <div class="error-message">
+          No valid enum key for <strong>{props.type.discriminant}</strong>
+        </div>
+      </Match>
+
+      <Match when={!caseType()}>
+        <div class="error-message">
+          No case for enum value <strong>{enumKey()}</strong>
+        </div>
+      </Match>
+
+      <Match when={true}>
+        <div class="match-container">
+          <ValueInput
+            name={props.name}
+            type={caseType()!}
+            expr={props.expr}
+            parentFields={props.parentFields}
+            value={innerValue()}
+            onChange={props.onChange}
+          />
+        </div>
+      </Match>
+    </Switch>
+  );
+}
 
 function ValueInput(props: {
   name: string;
@@ -279,64 +337,86 @@ function ValueInput(props: {
   value?: Value;
   onChange: (v: Value) => void;
 }): JSX.Element | null {
-  const { name, type, expr, parentFields, value, onChange } = props;
-  switch (type.kind) {
-    case "Int":
-      return (
-        <IntegerInput
-          name={name}
-          signed={type.signed}
-          width={type.width}
-          defaultNumber={type.default ?? 0}
-          value={value}
-          onChange={onChange}
+  return (
+    <Switch>
+      <Match when={props.type.kind === "Int" ? props.type : undefined}>
+        {(type) => <IntegerInput
+          name={props.name}
+          signed={type().signed}
+          width={type().width}
+          defaultNumber={type().default ?? 0}
+          value={props.value}
+          onChange={props.onChange}
+        />}
+      </Match>
+
+      <Match when={props.type.kind === "f32" || props.type.kind === "f64" ? props.type : undefined}>
+        {(type) => <FloatInput
+          name={props.name}
+          width={type().kind === "f64" ? 64 : 32}
+          defaultNumber={type().default ?? 0}
+          value={props.value}
+          onChange={props.onChange}
+        />}
+      </Match>
+
+      <Match when={props.type.kind === "CString" || props.type.kind === "HebrewString"}>
+        <StringInput
+          name={props.name}
+          value={props.value}
+          onChange={props.onChange}
         />
-      );
-    case "f32":
-    case "f64":
-      return (
-        <FloatInput
-          name={name}
-          width={type.kind === "f64" ? 64 : 32}
-          defaultNumber={type.default ?? 0}
-          value={value}
-          onChange={onChange}
-        />
-      );
-    case "CString":
-    case "HebrewString":
-      return <StringInput name={name} value={value} onChange={onChange} />;
-    case "Struct":
-      const struct = expr.get(type.name);
-      return struct ? (
-        <StructInput
-          name={name}
-          struct={struct}
-          expr={expr}
-          value={value}
-          onChange={onChange as any}
-        />
-      ) : null;
-    case "Enum":
-      // EnumInput in Solid would follow same pattern
-      return null;
-    case "Match":
-      // MatchInput in Solid would follow same pattern
-      return null;
-    case "Array":
-      return (
-        <ArrayInput
-          name={name}
-          type={type}
-          length={type.length}
-          expr={expr}
-          parentFields={parentFields}
-          value={value}
-          onChange={onChange as any}
-        />
-      );
-  }
-  return null;
+      </Match>
+
+      <Match when={props.type.kind === "Struct" ? props.type : undefined}>
+        {(type) => {
+          const structDef = props.expr.get(type().name);
+          return structDef ? (
+            <StructInput
+              name={props.name}
+              struct={structDef}
+              expr={props.expr}
+              value={props.value}
+              onChange={props.onChange}
+            />
+          ) : <div class="error-message">Struct “{type().name}” not found</div>;
+        }}
+      </Match>
+
+      <Match when={props.type.kind === "Enum" ? props.type : undefined}>
+        {(type) => <EnumInput
+          name={props.name}
+          type={type()}
+          expr={props.expr}
+          value={props.value}
+          onChange={(v) => props.onChange(v)}
+        />}
+      </Match>
+
+      <Match when={props.type.kind === "Match" ? props.type : undefined}>
+        {(type) => <MatchInput
+          name={props.name}
+          type={type()}
+          expr={props.expr}
+          parentFields={props.parentFields}
+          value={props.value}
+          onChange={(v) => props.onChange(v)}
+        />}
+      </Match>
+
+      <Match when={props.type.kind === "Array" ? props.type : undefined}>
+        {(type) => <ArrayInput
+          name={props.name}
+          type={type().elementType}
+          length={type().length}
+          expr={props.expr}
+          parentFields={props.parentFields}
+          value={props.value as Value[]}
+          onChange={(arr) => props.onChange(arr as unknown as Value)}
+        />}
+      </Match>
+    </Switch>
+  );
 }
 
 export default function StructBuilder(props: {
@@ -349,8 +429,6 @@ export default function StructBuilder(props: {
   const [fields, setFields] = createSignal<ValueMap>({});
   const struct = expr.get(structName);
 
-  if (!struct) return <div class="loading-message">Missing struct {structName}</div>;
-
   const handleSubmit = (e: Event) => {
     e.preventDefault();
     onSubmit(fields());
@@ -361,24 +439,29 @@ export default function StructBuilder(props: {
   );
 
   return (
-    <div class="form-container">
-      <h2 class="form-title">Building: {structName}</h2>
-      <div class="struct-size">Current Size: {currentSize()} bytes</div>
+    <Show
+      when={struct}
+      fallback={<div class="loading-message">Missing struct {structName}</div>}
+    >
+      <div class="form-container">
+        <h2 class="form-title">Building: {structName}</h2>
+        <div class="struct-size">Current Size: {currentSize()} bytes</div>
 
-      <form onSubmit={handleSubmit}>
-        <StructInput
-          name={structName}
-          struct={struct}
-          expr={expr}
-          onChange={(v) => setFields(v)}
-        />
+        <form onSubmit={handleSubmit}>
+          <StructInput
+            name={structName}
+            struct={struct!}
+            expr={expr}
+            onChange={(v) => setFields(v)}
+          />
 
-        <div class="form-actions">
-          <button type="submit" disabled={!isSocketReady} class="submit-button">
-            {!isSocketReady ? "Socket Disconnected" : "Send"}
-          </button>
-        </div>
-      </form>
-    </div>
+          <div class="form-actions">
+            <button type="submit" disabled={!isSocketReady} class="submit-button">
+              {isSocketReady ? "Send" : "Socket Disconnected"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Show>
   );
 }

@@ -185,7 +185,7 @@ export class Expr {
 
         if (mode === "default") {
           const enumFieldTuple = parentFieldTypes
-            ?.find(([fieldName, _field]) => fieldName === type.discriminant);
+            ?.find(([fieldName]) => fieldName === type.discriminant);
           let defaultEnumVal: string | undefined = undefined;
           if (enumFieldTuple) {
             const [, enumFT] = enumFieldTuple;
@@ -232,7 +232,7 @@ export class Expr {
                 return Infinity;
               case "default":
                 {
-                  const intFieldTuple = parentFieldTypes?.find(([fieldName, _]) => fieldName === field);
+                  const intFieldTuple = parentFieldTypes?.find(([fieldName]) => fieldName === field);
                   if (intFieldTuple) {
                     const [, intFT] = intFieldTuple;
                     if (intFT.kind === "Int" && intFT.default !== undefined) {

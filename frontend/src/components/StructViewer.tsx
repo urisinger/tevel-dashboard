@@ -11,10 +11,11 @@ export default function StructViewer(props: {
     parentFields?: ValueMap;
 }): JSX.Element | null {
 
-    const label = props.name && <label class="field-label">{props.name}</label>;
 
     const renderPrimitive = () => {
         if (typeof props.value === "object") return null;
+
+        const label = props.name && <label class="field-label">{props.name}</label>;
         const display = props.value?.toString() ?? "—";
 
         let typeLabel: string;
@@ -45,52 +46,46 @@ export default function StructViewer(props: {
 
     return (
         <Switch>
-            <Match when={props.type.kind === "Struct"}>
-                <Show
-                    when={!!props.expr.get((props.type as any).name)}
+            <Match when={props.type.kind === "Struct" ? props.type : undefined}>
+                {(type) => <Show
+                    when={props.expr.get(type().name)}
                     fallback={
-                        <div class="error-message">Unknown struct: {(type as any).name}</div>
+                        <div class="error-message">Unknown struct: {type().name}</div>
                     }
                 >
-                    <Show
-                        when={props.value !== undefined}
-                        fallback={null}
-                    >
-                        {(() => {
-                            const struct = props.expr.get((type as any).name)!;
-                            const fieldMap = props.value as ValueMap;
-                            return (
-                                <div class="struct-container">
-                                    {props.name && <div class="struct-header">{props.name}</div>}
-                                    <div class="struct-fields">
-                                        <For each={struct.fields}>
-                                            {([fieldName, fieldType]) => (
-                                                <StructViewer
-                                                    name={fieldName}
-                                                    value={fieldMap[fieldName]}
-                                                    type={fieldType}
-                                                    expr={props.expr}
-                                                    parentFields={fieldMap}
-                                                />
-                                            )}
-                                        </For>
-                                    </div>
+                    {(struct) => {
+                        const fieldMap = props.value as ValueMap;
+                        return (
+                            <div class="struct-container">
+                                {props.name && <div class="struct-header">{props.name}</div>}
+                                <div class="struct-fields">
+                                    <For each={struct().fields}>
+                                        {([fieldName, fieldType]) => (
+                                            <StructViewer
+                                                name={fieldName}
+                                                value={fieldMap[fieldName]}
+                                                type={fieldType}
+                                                expr={props.expr}
+                                                parentFields={fieldMap}
+                                            />
+                                        )}
+                                    </For>
                                 </div>
-                            );
-                        })()
-                        }
-                    </Show>
+                            </div>
+                        );
+                    }}
                 </Show>
+                }
             </Match>
 
-            <Match when={type.kind === "Match"}>
-                {(() => {
-                    const discr = parentFields?.[type.discriminant];
+            <Match when={props.type.kind === "Match" ? props.type : undefined}>
+                {(type) => {
+                    const discr = props.parentFields?.[type().discriminant];
                     const key =
                         typeof discr === "string"
                             ? discr
-                            : props.expr.getEnum(props.type.enumTypeName)?.keys().next().value;
-                    const caseType = key ? props.type.cases[key] : undefined;
+                            : props.expr.getEnum(type().enumTypeName)?.keys().next().value;
+                    const caseType = key && type().cases[key];
                     return caseType ? (
                         <StructViewer
                             name={props.name}
@@ -104,11 +99,11 @@ export default function StructViewer(props: {
                             Invalid match case for {props.name}: {String(key)}
                         </div>
                     );
-                })()}
+                }}
             </Match>
 
-            <Match when={props.type.kind === "Array"}>
-                {(() => {
+            <Match when={props.type.kind === "Array" ? props.type : undefined}>
+                {(type) => {
                     const items = Array.isArray(props.value) ? (props.value as Value[]) : [];
                     return (
                         <div class="struct-container">
@@ -117,9 +112,9 @@ export default function StructViewer(props: {
                                 <For each={items}>
                                     {(item, i) => (
                                         <StructViewer
-                                            name={`${name}[${i()}]`}
+                                            name={`${props.name}[${i()}]`}
                                             value={item}
-                                            type={props.type.}
+                                            type={type().elementType}
                                             expr={props.expr}
                                             parentFields={props.parentFields}
                                         />
@@ -128,7 +123,7 @@ export default function StructViewer(props: {
                             </div>
                         </div>
                     );
-                })()}
+                }}
             </Match>
 
             <Match when={true}>{renderPrimitive()}</Match>

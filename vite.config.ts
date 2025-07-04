@@ -1,5 +1,6 @@
-import { defineConfig } from 'vite'
-import solid from 'vite-plugin-solid'
+import { defineConfig } from 'vite';
+import solid from 'vite-plugin-solid';
+import devtools from 'solid-devtools/vite';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,7 +10,6 @@ export default defineConfig({
         target: 'ws://127.0.0.1:8080',
         ws: true,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/ws\//, '/api/ws/')
       },
       '/api/': {
         target: 'http://127.0.0.1:8080',
@@ -18,5 +18,11 @@ export default defineConfig({
     },
   },
   root: 'frontend',
-  plugins: [solid()],
+  plugins: [
+    devtools({
+      /* features options - all disabled by default */
+      autoname: true, // e.g. enable autoname
+    }),
+    solid()
+  ],
 })

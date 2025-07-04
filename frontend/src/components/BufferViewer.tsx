@@ -1,81 +1,106 @@
-import { createSignal, createEffect, For, JSX } from "solid-js";
+import { createSignal, createEffect, For, JSX, createMemo } from "solid-js";
 import { Expr, Value, ValueMap, FieldType } from "../expr";
 import StructViewer from "./StructViewer";
 
 import "./BufferViewer.css";
 import "./shared.css";
 
-type BufferViewerProps = {
-  bytes: ArrayBuffer;
-  expr: Expr;
-  valueType: string;
-};
 
 function HexViewer(props: { data: ArrayBuffer }): JSX.Element {
   const bytesPerRow = 16;
-  const byteArray = new Uint8Array(props.data);
-  const rows: Uint8Array[] = [];
-  for (let i = 0; i < byteArray.length; i += bytesPerRow) {
-    rows.push(byteArray.slice(i, i + bytesPerRow));
-  }
+
+  const byteArray = createMemo(() => new Uint8Array(props.data));
+
+  const rows = createMemo(() => {
+    const arr = byteArray();
+    const out: Uint8Array[] = [];
+    for (let i = 0; i < arr.length; i += bytesPerRow) {
+      out.push(arr.slice(i, i + bytesPerRow));
+    }
+    return out;
+  });
+
+  const headerIndices = Array.from({ length: bytesPerRow }, (_, i) => i);
 
   return (
     <div class="hex-viewer">
       <div class="hex-header">
         <div class="offset-header">Offset</div>
         <div class="bytes-header">
-          <For each={Array.from({ length: bytesPerRow }, (_, i) => i)}>
+          <For each={headerIndices}>
             {(i) => (
-              <span class="byte-header">{i.toString(16).padStart(2, "0")}</span>
+              <span class="byte-header">
+                {i.toString(16).padStart(2, "0")}
+              </span>
             )}
           </For>
         </div>
         <div class="ascii-header">ASCII</div>
       </div>
 
-      <For each={rows}>
-        {(row, rowIndex) => {
-          const offset = rowIndex() * bytesPerRow;
-          return (
-            <div class="hex-row">
-              <div class="offset-cell">
-                {offset.toString(16).padStart(8, "0")}
-              </div>
-              <div class="bytes-cell">
-                <For each={row}>
-                  {(byte) => (
-                    <span class="byte-value">
-                      {byte.toString(16).padStart(2, "0")}
-                    </span>
-                  )}
-                </For>
-                <For each={Array.from(
-                  { length: bytesPerRow - row.length },
-                  (_, i) => i
-                )}>
-                  {() => <span class="byte-empty">{"  "}</span>}
-                </For>
-              </div>
-              <div class="ascii-cell">
-                <For each={row}>
-                  {(byte) => {
-                    const char =
-                      byte >= 32 && byte <= 126
-                        ? String.fromCharCode(byte)
-                        : ".";
-                    return <span class="ascii-char">{char}</span>;
-                  }}
-                </For>
-              </div>
-            </div>
-          );
-        }}
+      <For each={rows()}>
+        {(row, rowIndex) => (
+          <HexRow
+            row={row}
+            rowIndex={rowIndex()}
+            bytesPerRow={bytesPerRow}
+          />
+        )}
       </For>
     </div>
   );
 }
 
-export default function BufferViewer(props: BufferViewerProps): JSX.Element | null {
+function HexRow(props: {
+  row: Uint8Array;
+  rowIndex: number;
+  bytesPerRow: number;
+}): JSX.Element {
+  const offset = createMemo(() => props.rowIndex * props.bytesPerRow);
+  const padding = createMemo(() => props.bytesPerRow - props.row.length);
+
+  const byteList = createMemo(() => Array.from(props.row));
+
+  return (
+    <div class="hex-row">
+      <div class="offset-cell">
+        {offset().toString(16).padStart(8, "0")}
+      </div>
+
+      <div class="bytes-cell">
+        <For each={byteList()}>
+          {(byte: number) => (
+            <span class="byte-value">
+              {byte.toString(16).padStart(2, "0")}
+            </span>
+          )}
+        </For>
+        <For each={Array(padding()).fill(0)}>
+          {() => <span class="byte-empty">{"  "}</span>}
+        </For>
+      </div>
+
+      <div class="ascii-cell">
+        <For each={byteList()}>
+          {(byte: number) => {
+            const char =
+              byte >= 32 && byte <= 126
+                ? String.fromCharCode(byte)
+                : ".";
+            return <span class="ascii-char">{char}</span>;
+          }}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+
+export default function BufferViewer(props: {
+  bytes: ArrayBuffer;
+  expr: Expr;
+  valueType: string;
+}): JSX.Element | null {
   const [parsedValue, setParsedValue] = createSignal<Value | undefined>();
   const [error, setError] = createSignal<string | undefined>();
   const [activeTab, setActiveTab] = createSignal<"structured" | "hex" | "json">(
@@ -165,11 +190,7 @@ export default function BufferViewer(props: BufferViewerProps): JSX.Element | nu
         {activeTab() === "json" && parsedValue() !== undefined && (
           <div class="json-view">
             <pre>
-              {JSON.stringify(
-                parsedValue(),
-                (_, v) => (typeof v === "bigint" ? v.toString() : v),
-                2
-              )}
+              {JSON.stringify(parsedValue())}
             </pre>
           </div>
         )}

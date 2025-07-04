@@ -1,8 +1,8 @@
-import { NavLink } from "solid-app-router";
-import { theme, toggleTheme } from "../state";
+import { A } from "@solidjs/router";
+import { refetchExpr, theme, toggleTheme } from "../state";
 import { JSX } from "solid-js";
 
-export function Sidebar(props: { onRefresh: () => void }): JSX.Element {
+export function Sidebar(): JSX.Element {
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -16,23 +16,25 @@ export function Sidebar(props: { onRefresh: () => void }): JSX.Element {
         <h2>Dashboard</h2>
         <button
           class="sidebar-item refresh-button"
-          onClick={() => props.onRefresh()}
+          onClick={() => void refetchExpr()}
           aria-label="Refresh structs definition"
         >
           🔄
         </button>
       </div>
       <nav class="sidebar-content">
-        <NavLink
+        <A
           href="/"
+          class="sidebar-item"
         >
           Send
-        </NavLink>
-        <NavLink
+        </A>
+        <A
           href="/history"
+          class="sidebar-item"
         >
           History
-        </NavLink>
+        </A>
       </nav>
     </aside>
   );

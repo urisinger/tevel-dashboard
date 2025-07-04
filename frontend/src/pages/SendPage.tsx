@@ -1,13 +1,12 @@
 import { JSX } from "solid-js";
 import StructBuilder from "../components/StructBuilder";
-import type { Value } from "../expr";
-import { websocket } from "../state";
-import { useExpr } from "../contexts/ExprContext";
+import type { Expr, Value } from "../expr";
+import { expr, websocket } from "../state";
 
 export default function SendPage(): JSX.Element {
   const handleSubmit = (value: Value) => {
     try {
-      const bytes = useExpr().encodeValue(value, "Main");
+      const bytes = (expr() as Expr).encodeValue(value, "Main");
       websocket.send(bytes);
     } catch (e) {
       console.error("Failed to encode value:", e);
@@ -18,9 +17,8 @@ export default function SendPage(): JSX.Element {
     <div class="send-page">
       <StructBuilder
         structName="Main"
-        expr={useExpr()}
-        // 1 (OPEN)
-        isSocketReady={websocket.readyState === 1}
+        expr={expr() as Expr}
+        isSocketReady={websocket.readyState === WebSocket.OPEN}
         onSubmit={handleSubmit}
       />
     </div>

@@ -145,6 +145,8 @@ async fn load_structs(path: &PathBuf) -> Result<Value, String> {
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<ApiState>) -> impl IntoResponse {
     let state = state.clone();
 
+    println!("WebSocket connected");
+
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
