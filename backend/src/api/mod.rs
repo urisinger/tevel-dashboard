@@ -35,6 +35,10 @@ pub struct ApiOpts {
     #[clap(long, default_value = "127.0.0.1:9002")]
     pub endnode_addr: SocketAddr,
 
+    #[cfg(feature = "endnode")]
+    #[clap(long, default_value = "json", value_parser = ["json", "bridge"])]
+    pub endnode_protocol: String,
+
     #[clap(long, default_value_t = 64)]
     pub in_chan_capacity: usize,
 
@@ -79,12 +83,24 @@ pub async fn api_service<S>(opt: ApiOpts) -> Router<S> {
     };
 
     #[cfg(feature = "endnode")]
-    tokio::spawn(endnode::endnode_task(
-        opt.endnode_addr,
-        rx_in,
-        tx_out,
-        state.recv_history.clone(),
-    ));
+    match opt.endnode_protocol.as_str() {
+        "bridge" => {
+            tokio::spawn(endnode::protocols::bridge::bridge_task(
+                opt.endnode_addr,
+                rx_in,
+                tx_out,
+                state.recv_history.clone(),
+            ));
+        }
+        _ => {
+            tokio::spawn(endnode::endnode_task(
+                opt.endnode_addr,
+                rx_in,
+                tx_out,
+                state.recv_history.clone(),
+            ));
+        }
+    }
 
     Router::new()
         .route("/ws/", get(ws_handler))

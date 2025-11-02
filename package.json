@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"npm run backend:run\"",
+    "dev:bridge": "concurrently \"vite\" \"npm run backend:run:bridge\"",
     "build": "npm run lint && tsc && vite build && npm run backend:build-release",
     "lint": "eslint .",
     "preview": "concurrently \"vite preview\" \"npm run backend:run\"",
     "backend:build-release": "cargo build --manifest-path=backend/Cargo.toml --release --features \"api static-files endnode\"",
     "backend:run": "cargo run --manifest-path=backend/Cargo.toml --release --features \"api\" -- --structs structs.def",
+    "backend:run:bridge": "cargo run --manifest-path=backend/Cargo.toml --release --features \"api endnode\" -- --structs structs.def --endnode-protocol bridge",
     "release": "vite build && cargo run --manifest-path=backend/Cargo.toml --release --features \"api static-files\" -- --structs structs.def"
   },
   "dependencies": {

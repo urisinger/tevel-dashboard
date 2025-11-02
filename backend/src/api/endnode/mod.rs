@@ -10,6 +10,8 @@ use tokio::{
 };
 use tracing::{info, warn};
 
+pub mod protocols;
+
 fn extract_buffer(v: &Value) -> Option<Vec<u8>> {
     v.get("data")?
         .get("data")?

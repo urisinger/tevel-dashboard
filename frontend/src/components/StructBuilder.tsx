@@ -7,6 +7,7 @@ import "./shared.css";
 function IntInput(props: { value: Accessor<bigint>; setValue: (v: bigint) => void; signed: boolean; width: number }): JSX.Element {
   return (
     <input
+      class="field-input"
       type="number"
       value={props.value().toString()}
       onInput={(e) => props.setValue(BigInt((e.target as HTMLInputElement).value || "0"))}
@@ -17,6 +18,7 @@ function IntInput(props: { value: Accessor<bigint>; setValue: (v: bigint) => voi
 function FloatInput(props: { value: Accessor<number>; setValue: (v: number) => void }): JSX.Element {
   return (
     <input
+      class="field-input"
       type="number"
       step="any"
       value={props.value()}
@@ -28,6 +30,7 @@ function FloatInput(props: { value: Accessor<number>; setValue: (v: number) => v
 function StringInput(props: { value: Accessor<string>; setValue: (v: string) => void }): JSX.Element {
   return (
     <input
+      class="field-input"
       type="text"
       value={props.value()}
       onInput={(e) => props.setValue((e.target as HTMLInputElement).value)}
@@ -40,7 +43,7 @@ function EnumInput(props: { value: Accessor<string>; setValue: (v: string) => vo
   if (!enumDef) return <div>Unknown enum: {props.enumName}</div>;
   const keysMemo = createMemo(() => [...enumDef.keys()]);
   return (
-    <select value={props.value()} onChange={(e) => props.setValue(e.currentTarget.value)}>
+    <select class="field-input" value={props.value()} onChange={(e) => props.setValue(e.currentTarget.value)}>
       <For each={keysMemo()}>
         {(key) => <option value={key}>{key}</option>}
       </For>
@@ -213,7 +216,7 @@ function StructInput(props: {
 
   return (
     <div class="struct-container">
-      <div class="struct-header">{props.name}</div>
+      <div class="struct-header">{props.type.name}</div>
       <For each={struct()?.fields}>
         {([fieldName, fieldType]) => (
           <ValueInput
@@ -239,16 +242,13 @@ function MatchInput(props: {
   allFields: Accessor<ValueMap>;
 }): JSX.Element {
   const enumKey = createMemo(() => {
-    console.log("allFields", props.allFields());
-    console.log("discriminant", props.type.discriminant);
     const d = props.allFields()[props.type.discriminant];
     if (typeof d === "string") return d;
     const first = props.expr.getEnum(props.type.enumTypeName)?.keys().next().value;
-    console.log("enumKey", first);
     return first;
   });
 
-  const caseType = () => (enumKey() ? props.type.cases[enumKey() as string] : undefined);
+  const caseType = createMemo(() => (enumKey() ? props.type.cases[enumKey() as string] : undefined));
 
   return (
     <Switch>
@@ -313,12 +313,7 @@ export default function StructBuilder(props: {
               name={fieldName}
               type={fieldType}
               value={() => fields()[fieldName]}
-              setValue={(v) => {
-                const newFields = { ...fields() };
-                newFields[fieldName] = v;
-                console.log("newFields", newFields);
-                setFields(newFields);
-              }}
+              setValue={(v) => setFields({ ...fields(), [fieldName]: v })}
               expr={props.expr}
               allFields={() => fields()}
             />
