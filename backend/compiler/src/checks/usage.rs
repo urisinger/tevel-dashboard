@@ -13,24 +13,56 @@ pub fn check_usage(
 ) {
     for ast in types.values() {
         match ast {
-            DefinitionAST::Struct { fields, .. } => {
-                let mut enum_names = HashMap::new();
-                for ((label, field), span) in &fields.0 {
-                    let enum_name = if let FieldAST::Enum { name, .. } = &field.0 {
-                        Some(name.0.clone())
-                    } else {
-                        None
-                    };
+            DefinitionAST::Struct { parameters, fields, .. } => {
+                // Collect parameter names for validation
+                let mut param_names = HashSet::new();
+                if let Some(params) = parameters {
+                    for (param, _span) in &params.0 {
+                        if !param_names.insert(param.name.0.clone()) {
+                            emit(
+                                format!("Duplicate parameter '{}' in struct", param.name.0),
+                                param.name.1,
+                                ast.name_span(),
+                            );
+                        }
+                    }
+                }
 
-                    if enum_names.insert(label.0.clone(), enum_name).is_some() {
+                // Check for conflicts between parameter names and field names
+                let mut field_names = HashSet::new();
+                for ((label, _field), span) in &fields.0 {
+                    field_names.insert(label.0.clone());
+                    
+                    // Check if this field name conflicts with any parameter name
+                    if param_names.contains(&label.0) {
+                        emit(
+                            format!("Field name '{}' conflicts with parameter name", label.0),
+                            *span,
+                            ast.name_span(),
+                        );
+                    }
+                }
+
+                // First pass: collect all field names and enum types
+                let mut field_types = HashMap::new();
+                if let Some(params) = parameters {
+                    for (param, _span) in &params.0 {
+                        field_types.insert(param.name.0.clone(), &param.param_type.0);
+                    }
+                }
+                for ((label, field), span) in &fields.0 {
+                    if field_types.insert(label.0.clone(), &field.0).is_some() {
                         emit(
                             format!("Duplicate field '{}' in struct", label.0),
                             *span,
                             ast.name_span(),
                         );
                     }
+                }
 
-                    check_field_usage(&field.0, &enum_names, types, &mut |e, s| {
+                // Second pass: validate field usage with complete field and parameter context
+                for ((_label, field), _span) in &fields.0 {
+                    check_field_usage(&field.0, &field_types, &param_names, types, &mut |e, s| {
                         emit(e, s, ast.name_span())
                     });
                 }
@@ -54,14 +86,34 @@ pub fn check_usage(
 
 fn check_field_usage(
     ast: &FieldAST,
-    field_enum_names: &HashMap<String, Option<String>>,
+    field_enum_names: &HashMap<String, &FieldAST>,
+    param_names: &HashSet<String>,
     built_types: &HashMap<String, DefinitionAST>,
     emit: &mut impl FnMut(String, Span),
 ) {
     match ast {
-        FieldAST::Struct { name } => {
+        FieldAST::Struct { name, arguments } => {
             if !built_types.contains_key(&name.0) {
                 emit(format!("Undefined struct type '{}'", name.0), name.1);
+            }
+            // TODO: Validate arguments against struct parameters
+            if let Some(args) = arguments {
+                for (arg, _span) in &args.0 {
+                    match arg {
+                        crate::syntax::ArgumentExpr::Identifier(identifier) => {
+                            // Check if it's a valid field or parameter name
+                            let is_field = field_enum_names.contains_key(identifier);
+                            let is_param = param_names.contains(identifier);
+                            
+                            if !is_field && !is_param {
+                                emit(format!("Undefined identifier '{}' (not a field or parameter)", identifier), name.1);
+                            }
+                        }
+                        crate::syntax::ArgumentExpr::Literal(_) => {
+                            // Literals are always valid
+                        }
+                    }
+                }
             }
         }
         FieldAST::Match {
@@ -70,8 +122,8 @@ fn check_field_usage(
         } => {
             let disc = &discriminant.0;
             let enum_name = if let Some(disc_ty) = field_enum_names.get(disc) {
-                if let Some(name) = disc_ty {
-                    name
+                if let FieldAST::Enum { name, .. } = &disc_ty {
+                    &name.0
                 } else {
                     emit(
                         format!("Field '{}' is not an enum at this use site", disc),
@@ -132,11 +184,11 @@ fn check_field_usage(
                 }
             }
             for ((_, (ft_ast, _)), _) in &cases.0 {
-                check_field_usage(ft_ast, field_enum_names, built_types, emit);
+                check_field_usage(ft_ast, field_enum_names, param_names, built_types, emit);
             }
         }
         FieldAST::Array { element_type, .. } => {
-            check_field_usage(&element_type.0, field_enum_names, built_types, emit);
+            check_field_usage(&element_type.0, field_enum_names, param_names, built_types, emit);
         }
         _ => {}
     }

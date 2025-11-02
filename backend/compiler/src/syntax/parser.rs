@@ -4,7 +4,7 @@ use chumsky::{input::ValueInput, prelude::*};
 
 use crate::definition::ArrayLength;
 
-use super::{lexer::Token, DefinitionAST, FieldAST, Span};
+use super::{lexer::Token, DefinitionAST, FieldAST, Parameter, ArgumentExpr, Span};
 
 pub fn parser<'tokens, 'src: 'tokens, I>() -> impl Parser<
     'tokens,
@@ -58,17 +58,29 @@ where
             |span| ((Vec::new(), span), true),
         )));
 
+    let parameter_field_type = type_parser()
+        .labelled("type")
+        .map_with(|field, e| (field, e.span()));
+
+    let parameter = ident
+        .then_ignore(just(Token::Colon))
+        .then(parameter_field_type)
+        .map(|(name, param_type)| Parameter { name, param_type })
+        .map_with(|param, e| (param, e.span()));
+
+    let parameters = parameter
+        .separated_by(just(Token::Comma))
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LParen), just(Token::RParen))
+        .map_with(|params, e| (params, e.span()))
+        .or_not();
+
     let struct_def = just(Token::Struct)
         .ignore_then(ident)
-        .then(struct_body)
+        .then(parameters)
+        .then(struct_body.clone())
         .boxed()
-        .validate(|(name, (fields, saw_close)), e, emitter| {
-            if !saw_close {
-                emitter.emit(Rich::custom(e.span(), "unclosed struct body"));
-            }
-            (name, fields)
-        })
-        .map(|(name, fields)| (name.0.clone(), DefinitionAST::Struct { name, fields }));
+        .map(|((name, params), (fields, _saw_close))| (name.0.clone(), DefinitionAST::Struct { name: name, parameters: params, fields }));
 
     let enum_entry = ident
         .then_ignore(just(Token::Equal))
@@ -181,7 +193,24 @@ where
                 )
         };
 
-        let struct_type = ident.map(|name| FieldAST::Struct { name });
+        let argument_expr = choice((
+            ident.map(|name| ArgumentExpr::Identifier(name.0)),
+            int_lit.map(|val| ArgumentExpr::Literal(val.0)),
+        ))
+        .map_with(|arg, e| (arg, e.span()));
+
+        let arguments = argument_expr
+            .separated_by(just(Token::Comma))
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LParen), just(Token::RParen))
+            .map_with(|args, e| (args, e.span()))
+            .or_not();
+
+        let struct_type = ident
+            .then(arguments)
+            .map(|(name, arguments)| FieldAST::Struct { name, arguments });
+
+        // Parameter references are no longer needed as separate field types
 
         let array_type = field_type
             .clone()

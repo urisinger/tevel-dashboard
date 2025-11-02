@@ -1,63 +1,32 @@
-enum ShapeType {
-  Circle = 0,
-  Rectangle = 1,
-  Triangle = 2
+// Simple test for parameter syntax
+
+enum MessageType {
+  Data = 1,
+  Command = 2,
 }
 
-enum Language {
-  English = 0,
-  Hebrew = 1
-}
-
-struct Point {
-  x: f32,
-  y: f32
-}
-
-struct CircleData {
-  radius: f32
-}
-
-struct RectangleData {
-  width: f32,
-  height: f32
-}
-
-struct TriangleData {
-  a: Point,
-  b: Point,
-  c: Point
-}
-
-struct DrawingMetadata {
-  test: i17 = 1,
-  language: Language(i8) = Hebrew,
-  title: match language {
-    English => CString,
-    Hebrew => HebrewString,
+struct DataPayload(subtype: MessageType(u8)) {
+  actual_size: u8,
+  footer: match subtype {
+    Data => u16,
+    Command => u32,
   },
-  tagsCount: i8,
-  tags: [match language {
-    English => CString,
-    Hebrew => HebrewString,
-  }
-  ; tagsCount] // dynamic array
 }
 
-struct Shape {
-  kind: ShapeType(i8),
-  data: match kind {
-    Circle => CircleData,
-    Rectangle => RectangleData,
-    Triangle => TriangleData
+struct CommandPayload(subtype: MessageType(u8)) {
+  command_id: u8,
+  extra: match subtype {
+    Data => u8,
+    Command => [u8; 4],
   },
-  position: Point
 }
 
 struct Main {
-  metadata: DrawingMetadata,
-  shapeCount: i16,
-  shapes: [Shape; shapeCount], // dynamic array
-  scaleFactors: [f64 = 0.3; 3],      // static array
-  caption: HebrewString        // Hebrew-encoded string
+  msg_type: MessageType(u8),
+  msg_subtype: MessageType(u8),
+  size: u16,
+  payload: match msg_type {
+    Data => DataPayload(msg_subtype),
+    Command => CommandPayload(msg_subtype),
+  },
 }

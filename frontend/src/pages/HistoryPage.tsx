@@ -48,9 +48,7 @@ export default function HistoryPage() {
           <ul class="history-list">
             <For each={history() || []}>
               {buffer => (
-                <li class="history-item">
-                  <BufferViewer bytes={buffer} expr={expr() as Expr} valueType="Main" />
-                </li>
+                <BufferViewer bytes={buffer} expr={expr() as Expr} valueType="Main" />
               )}
             </For>
           </ul>

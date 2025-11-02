@@ -1,0 +1,16 @@
+[
+  {
+    "type": "Struct",
+    "name": "Simple",
+    "fields": [
+      [
+        "data",
+        {
+          "kind": "Int",
+          "signed": false,
+          "width": 8
+        }
+      ]
+    ]
+  }
+]

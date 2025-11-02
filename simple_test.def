@@ -1,0 +1,10 @@
+// Simple test for parameter syntax
+
+struct Simple(length: u16) {
+  data: [u8; length],
+}
+
+struct Main {
+  size: u16,
+  payload: Simple(size),
+}

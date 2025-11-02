@@ -21,8 +21,17 @@ export type ArrayLength =
   | { kind: "Static"; value: number }
   | { kind: "Dynamic"; field: string };
 
+export type ArgumentValue = 
+  | { kind: "Identifier"; name: string }
+  | { kind: "Literal"; value: number };
+
+export type Parameter = {
+  name: string;
+  paramType: FieldType;
+};
+
 export type FieldType = (
-  | { kind: "Struct"; name: string }
+  | { kind: "Struct"; name: string; arguments?: ArgumentValue[] }
   | {
     kind: "Array";
     elementType: FieldType;
@@ -54,6 +63,70 @@ export type FieldType = (
 
 export interface Struct {
   fields: [string, FieldType][];
+  parameters?: Parameter[];
+}
+
+export type ParameterValue = number | string | boolean;
+
+export class ParameterContext {
+  private parameters: Map<string, ParameterValue> = new Map();
+  private fieldValues: Map<string, ParameterValue> = new Map();
+
+  constructor(
+    parameters?: Map<string, ParameterValue>,
+    fieldValues?: Map<string, ParameterValue>
+  ) {
+    this.parameters = parameters ?? new Map();
+    this.fieldValues = fieldValues ?? new Map();
+  }
+
+  addFieldValue(name: string, value: ParameterValue): void {
+    this.fieldValues.set(name, value);
+  }
+
+  resolveArgument(arg: ArgumentValue): ParameterValue | undefined {
+    switch (arg.kind) {
+      case "Identifier":
+        // Try field first, then parameter
+        return this.fieldValues.get(arg.name) ?? this.parameters.get(arg.name);
+      case "Literal":
+        return arg.value;
+    }
+  }
+
+  createChildContext(
+    parameterNames: string[],
+    args: ArgumentValue[]
+  ): ParameterContext {
+    const newParams = new Map<string, ParameterValue>();
+    
+    parameterNames.forEach((paramName, index) => {
+      if (args[index]) {
+        const resolvedValue = this.resolveArgument(args[index]);
+        if (resolvedValue !== undefined) {
+          newParams.set(paramName, resolvedValue);
+        }
+      }
+    });
+
+    return new ParameterContext(newParams, new Map());
+  }
+
+  getParameter(name: string): ParameterValue | undefined {
+    return this.parameters.get(name);
+  }
+
+  getFieldValue(name: string): ParameterValue | undefined {
+    return this.fieldValues.get(name);
+  }
+
+  hasParameter(name: string): boolean {
+    return this.parameters.has(name);
+  }
+
+  getParameterNames(): string[] {
+    return Array.from(this.parameters.keys());
+  }
 };
 
 export class Expr {
@@ -62,7 +135,7 @@ export class Expr {
 
   constructor(
     types: (
-      | { type: "Struct"; name: string; fields: [string, FieldType][] }
+      | { type: "Struct"; name: string; fields: [string, FieldType][]; parameters?: Parameter[] }
       | { type: "Enum"; name: string; entries: [string, number][] }
     )[]
   ) {
@@ -71,7 +144,10 @@ export class Expr {
 
     for (const def of types) {
       if (def.type === "Struct") {
-        this.structs[def.name] = { fields: def.fields };
+        this.structs[def.name] = { 
+          fields: def.fields,
+          parameters: def.parameters 
+        };
       } else if (def.type === "Enum") {
         this.enums[def.name] = new Map(def.entries);
       }
@@ -583,20 +659,53 @@ export class Expr {
   }
 
 
-  decodeValue(buf: ArrayBuffer, layoutName: string): Value | undefined {
+  decodeValue(
+    buf: ArrayBuffer, 
+    layoutName: string, 
+  ): Value | undefined {
     const reader = new BitReader(buf);
-    const result = this.readValueHelper(reader, { kind: "Struct", name: layoutName }, {});
+    const paramContext = new ParameterContext();
+    const result = this.readValueHelper(
+      reader, 
+      { kind: "Struct", name: layoutName }, 
+      {}, 
+      paramContext
+    );
     if (result === undefined) return undefined;
     return result;
   }
 
-
   private readValueHelper(
     reader: BitReader,
     type: FieldType,
-    parentFields: ValueMap
+    parentFields: ValueMap,
+    context: ParameterContext
   ): Value | undefined {
     switch (type.kind) {
+      case "Struct": {
+        const struct = this.get(type.name);
+        if (!struct) throw new Error(`Struct '${type.name}' not found`);
+
+        // Create child context if arguments are provided
+        let childContext = context;
+        if (type.arguments && struct.parameters) {
+          const paramNames = struct.parameters.map(p => p.name);
+          childContext = context.createChildContext(paramNames, type.arguments);
+        }
+
+        const result: ValueMap = {};
+        for (const [fieldName, fieldType] of struct.fields) {
+          const fieldValue = this.readValueHelper(reader, fieldType, result, childContext);
+          if (fieldValue === undefined) return undefined;
+          result[fieldName] = fieldValue;
+          
+          // Add field value to context for potential parameter references
+          if (typeof fieldValue === 'number' || typeof fieldValue === 'string' || typeof fieldValue === 'boolean') {
+            childContext.addFieldValue(fieldName, fieldValue);
+          }
+        }
+        return result;
+      }
       case "Int": {
         if (type.signed) {
           return reader.readInt(type.width);
@@ -640,17 +749,6 @@ export class Expr {
         return dv.getFloat64(0, true);
       }
 
-      case "Struct": {
-        const structDef = this.get(type.name);
-        if (!structDef) throw new Error(`Unknown struct '${type.name}'`);
-        const out: ValueMap = {};
-        for (const [fname, ftype] of structDef.fields) {
-          const v = this.readValueHelper(reader, ftype, out);
-          if (v !== undefined) out[fname] = v;
-        }
-        return out;
-      }
-
       case "Match": {
         // read discriminant first
         const discr = parentFields[type.discriminant];
@@ -661,7 +759,7 @@ export class Expr {
         if (!caseType) {
           throw new Error(`No case for '${discr}' in match`);
         }
-        return this.readValueHelper(reader, caseType, parentFields);
+        return this.readValueHelper(reader, caseType, parentFields, context);
       }
 
       case "Array": {
@@ -677,7 +775,7 @@ export class Expr {
         }
         const arr: (Value | undefined)[] = [];
         for (let i = 0; i < length; i++) {
-          const v = this.readValueHelper(reader, type.elementType, parentFields);
+          const v = this.readValueHelper(reader, type.elementType, parentFields, context);
           arr.push(v);
         }
         return arr;

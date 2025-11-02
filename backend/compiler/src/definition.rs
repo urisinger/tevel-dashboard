@@ -10,12 +10,19 @@ use crate::syntax::{DefinitionAST, FieldAST};
 pub enum Definition {
     Struct {
         name: String,
+        parameters: Vec<Parameter>,
         fields: Vec<(String, FieldType)>,
     },
     Enum {
         name: String,
         entries: Vec<(String, i64)>,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Parameter {
+    pub name: String,
+    pub param_type: FieldType,
 }
 
 impl Definition {
@@ -26,11 +33,13 @@ impl Definition {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "kind")]
 pub enum FieldType {
     Struct {
         name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arguments: Option<Vec<ArgumentValue>>,
     },
     Array {
         #[serde(rename = "elementType")]
@@ -76,18 +85,36 @@ pub enum FieldType {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "kind")]
+pub enum ArgumentValue {
+    Identifier { name: String },  // Resolved during validation to field or parameter
+    Literal { value: i64 },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "kind")]
 pub enum ArrayLength {
     Static { value: u32 },
     Dynamic { field: String },
 }
 
-fn build_field(ast: &FieldAST, parent_fields: &IndexMap<String, FieldType>) -> Option<FieldType> {
+fn build_field(ast: &FieldAST, parent_fields: &HashMap<String, FieldType>) -> Option<FieldType> {
     match ast {
-        FieldAST::Struct { name } => Some(FieldType::Struct {
-            name: name.0.clone(),
-        }),
+        FieldAST::Struct { name, arguments } => {
+            let args = arguments.as_ref().map(|args| {
+                args.0.iter().map(|(arg, _)| {
+                    match arg {
+                        crate::syntax::ArgumentExpr::Identifier(name) => ArgumentValue::Identifier { name: name.clone() },
+                        crate::syntax::ArgumentExpr::Literal(value) => ArgumentValue::Literal { value: *value },
+                    }
+                }).collect()
+            });
+            Some(FieldType::Struct {
+                name: name.0.clone(),
+                arguments: args,
+            })
+        },
         FieldAST::Array {
             element_type,
             length,
@@ -167,16 +194,41 @@ fn build_field(ast: &FieldAST, parent_fields: &IndexMap<String, FieldType>) -> O
 
 pub fn build_definition(ast: &DefinitionAST) -> Option<Definition> {
     match ast {
-        DefinitionAST::Struct { name, fields } => {
+        DefinitionAST::Struct { name, parameters, fields } => {
             let struct_name = name.0.clone();
+            
+            // Build parameters
+            let mut field_map = HashMap::new();
+
+            let mut built_parameters = Vec::new();
+            if let Some(params) = parameters {
+                for (param, _) in &params.0 {
+                    let param_name = param.name.0.clone();
+
+                    let built_field = build_field(&param.param_type.0, &HashMap::new()).unwrap_or(FieldType::Int { signed: true, width: 32, default: None });
+                    field_map.insert(param_name.clone(), built_field.clone());
+                    built_parameters.push(Parameter {
+                        name: param_name,
+                        param_type: built_field,
+                    });
+
+                }
+            }
+
+            
+            // Build fields
             let mut built_fields = IndexMap::new();
             for ((label, field), _) in &fields.0 {
-                if let Some(ft) = build_field(&field.0, &built_fields) {
+
+                if let Some(ft) = build_field(&field.0, &field_map) {
+                    field_map.insert(label.0.clone(), ft.clone());
+
                     built_fields.insert(label.0.clone(), ft);
                 }
             }
             Some(Definition::Struct {
                 name: struct_name,
+                parameters: built_parameters,
                 fields: built_fields.into_iter().collect(),
             })
         }

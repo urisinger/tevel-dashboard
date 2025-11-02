@@ -15,6 +15,7 @@ pub type Spanned<T> = (T, Span);
 pub enum DefinitionAST {
     Struct {
         name: Spanned<String>,
+        parameters: Option<Spanned<Vec<Spanned<Parameter>>>>,
         #[allow(clippy::type_complexity)]
         fields: Spanned<Vec<Spanned<(Spanned<String>, Spanned<FieldAST>)>>>,
     },
@@ -23,6 +24,12 @@ pub enum DefinitionAST {
         #[allow(clippy::type_complexity)]
         entries: Spanned<Vec<Spanned<(Spanned<String>, Spanned<i64>)>>>,
     },
+}
+
+#[derive(Debug)]
+pub struct Parameter {
+    pub name: Spanned<String>,
+    pub param_type: Spanned<FieldAST>,
 }
 
 impl DefinitionAST {
@@ -43,6 +50,7 @@ impl DefinitionAST {
 pub enum FieldAST {
     Struct {
         name: Spanned<String>,
+        arguments: Option<Spanned<Vec<Spanned<ArgumentExpr>>>>,
     },
     Array {
         element_type: Box<Spanned<FieldAST>>,
@@ -78,4 +86,10 @@ pub enum FieldAST {
     HebrewString {
         default: Option<Spanned<String>>,
     },
+}
+
+#[derive(Debug)]
+pub enum ArgumentExpr {
+    Identifier(String),  // Could be field or parameter - resolved during validation
+    Literal(i64),
 }

@@ -1,6 +1,62 @@
 @import "./shared.css";
 @import "../styles/theme.css";
 
+/* Parameter display styles */
+.parameter-info {
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--accent-color);
+}
+
+.parameter-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.parameter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.parameter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+}
+
+.param-name {
+    color: var(--text-primary);
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.param-source {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.param-value {
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.identifier {
+    color: var(--success-color);
+}
+
+.literal {
+    color: var(--info-color);
+}
+
 .structured-view {
     padding: var(--spacing-sm);
 }

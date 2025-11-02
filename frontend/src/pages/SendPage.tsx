@@ -1,7 +1,7 @@
 import { JSX } from "solid-js";
 import StructBuilder from "../components/StructBuilder";
 import type { Expr, Value } from "../expr";
-import { expr, websocket } from "../state";
+import { expr, socketReady, websocket } from "../state";
 
 export default function SendPage(): JSX.Element {
   const handleSubmit = (value: Value) => {
@@ -18,7 +18,7 @@ export default function SendPage(): JSX.Element {
       <StructBuilder
         structName="Main"
         expr={expr() as Expr}
-        isSocketReady={websocket.readyState === WebSocket.OPEN}
+        isSocketReady={socketReady() === WebSocket.OPEN}
         onSubmit={handleSubmit}
       />
     </div>

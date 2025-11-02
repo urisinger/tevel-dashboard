@@ -1,5 +1,5 @@
 import { createSignal, createEffect, For, JSX, createMemo } from "solid-js";
-import { Expr, Value, ValueMap, FieldType } from "../expr";
+import { Expr, Value, ValueMap, FieldType, ParameterContext } from "../expr";
 import StructViewer from "./StructViewer";
 
 import "./BufferViewer.css";
@@ -190,8 +190,12 @@ export default function BufferViewer(props: {
         {activeTab() === "json" && parsedValue() !== undefined && (
           <div class="json-view">
             <pre>
-              {JSON.stringify(parsedValue())}
+              {JSON.stringify(parsedValue(), (_, v) =>
+                typeof v === "bigint" ? v.toString(): v,
+                  2
+                )}
             </pre>
+
           </div>
         )}
 

@@ -35,6 +35,12 @@ export function Sidebar(): JSX.Element {
         >
           History
         </A>
+        <A
+          href="/custom"
+          class="sidebar-item"
+        >
+          Data Viewer
+        </A>
       </nav>
     </aside>
   );

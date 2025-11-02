@@ -56,7 +56,7 @@ fn get_referenced_structs<'a>(
                     .0
                     .iter()
                     .filter_map(move |((_, (field_type, _)), _)| {
-                        if let FieldAST::Struct { name } = field_type {
+                        if let FieldAST::Struct { name, .. } = field_type {
                             Some(name.0.as_str())
                         } else {
                             None
